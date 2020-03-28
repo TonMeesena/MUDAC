@@ -37,5 +37,9 @@ df.dockets_district$highOrLow <-
 p1 <- ggplot(df.dockets_district, aes(x = dockets_district, y = Freq)) +
   geom_bar(stat = "identity")
 p2 <- ggplot(df.dockets_district, aes(x = dockets_district, y = ratioTo100000)) +
-  geom_bar(stat = "identity")
+  geom_bar(stat = "identity") + 
+  geom_col(fill = ifelse(df.dockets_district$highOrLow >= 1, "lightsalmon2", "gray39"))
+
 grid.arrange(p1, p2, nrow = 1)
+
+
