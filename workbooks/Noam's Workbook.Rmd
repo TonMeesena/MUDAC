@@ -7,24 +7,55 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(psych)
+library(ggplot2)
+library(plyr)
+library(tidyverse)
+library(caret)
+library(Metrics)
+library(dplyr)
+library(corrplot)
+library(randomForest)
+library(readr)
 ```
 
-## R Markdown
+#loading data
+```{r}
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+train_dockets <- read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/train_dockets.csv")
+train_termination_motions<-read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/train_terminating_motions.csv")
+train_other_motions<-read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/train_other_motions.csv",header=TRUE)
+test_dockets<-read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/test_dockets.csv",header=TRUE)
+test_termination_motions<-read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/test_terminating_motions.csv",header=TRUE)
+test_other_motions<-read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/test_other_motions.csv",header=TRUE)
 ```
 
-## Including Plots
+#Data manipulation
+##Wrangling
+```{r}
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+#Questions
+
+#Q4
+##a)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
