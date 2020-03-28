@@ -35,11 +35,15 @@ df.dockets_district$highOrLow <-
 
 #plotting
 p1 <- ggplot(df.dockets_district, aes(x = dockets_district, y = Freq)) +
-  geom_bar(stat = "identity")
+  geom_bar(stat = "identity") + ggtitle("Districts' Frequencies") +
+  xlab("Districts") + ylab("Frequency")
 p2 <- ggplot(df.dockets_district, aes(x = dockets_district, y = ratioTo100000)) +
   geom_bar(stat = "identity") + 
-  geom_col(fill = ifelse(df.dockets_district$highOrLow >= 1, "lightsalmon2", "gray39"))
+  geom_col(fill = ifelse(df.dockets_district$highOrLow >= 1, "lightsalmon2", "gray39")) + 
+  ggtitle("Districts' Ratio Over 100,000") + xlab("Districts") + ylab("Ratio Over 100,000")
 
 grid.arrange(p1, p2, nrow = 1)
+
+
 
 
