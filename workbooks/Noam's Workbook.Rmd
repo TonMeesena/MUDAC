@@ -11,6 +11,8 @@ library(psych)
 library(ggplot2)
 library(plyr)
 library(tidyverse)
+library(partykit)
+library(rpart)
 library(caret)
 library(Metrics)
 library(dplyr)
@@ -21,7 +23,6 @@ library(readr)
 
 #loading data
 ```{r}
-
 train_dockets <- read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/train_dockets.csv")
 train_termination_motions<-read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/train_terminating_motions.csv")
 train_other_motions<-read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/train_other_motions.csv",header=TRUE)
@@ -33,22 +34,94 @@ test_other_motions<-read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/test_ot
 #Data manipulation
 ##Wrangling
 ```{r}
+train_dockets <- train_dockets %>% mutate(dismissed =ifelse(outcome == "Dismissed",1,0))
+```
+##Merging
+```{r}
+train_other <- full_join(train_dockets, train_other_motions, by = "mudac_id")
+
+train_termination <- full_join(train_dockets, train_termination_motions, by = "mudac_id")
+
+train_full <- full_join(train_dockets, train_other_motions, by = "mudac_id")
+train <- full_join(train_full, train_termination_motions, by = "mudac_id")
+colnames(train_full)[37:46] <- c("other_motion_type", "other_filing_party", "other_filed_before_joined",
+                                 "other_decision", "other_decided_before_jointed", "other_proceeding_percentile",
+                                 "termination_motion_type", "termination_filing_party",
+                                 "termination_filed_before_joined", "termination_proceeding_percentile")
+```
+
+#Questions
+
+#Q4) The MUDAC 2020 challenge is centered around the desire to better understand what influences the final outcome of a case. Recall, the primary outcomes of this investigation are 1) whether or not the case was terminated via a motion to dismiss, 2) whether or not the case was terminated via a motion for summary judgement, and 3) whether or not the case was settled before going to trial
+
+##a) [Level: Beginner/Intermediate] Identify characteristics of a case that appear to be indicative of a case’s outcome
+```{r}
+#growing trees
+train_summary_judgment <- train_dockets %>% select(-c(outcome, settled, dismissed,mudac_id,primarytitle,nos_text))
+tree_summary_judgment <- rpart(summary_judgment ~ ., data = train_summary_judgment, method = "class")
+
+train_settled <- train_dockets %>% select(-c(outcome, summary_judgment, dismissed,mudac_id,primarytitle,nos_text))
+tree_settled <- rpart(settled ~ ., data = train_settled, method = "class")
+
+train_dismissed <- train_dockets %>% select(-c(outcome, settled, summary_judgment,mudac_id,primarytitle,nos_text))
+tree_dismissed <- rpart(dismissed ~ ., data = train_dismissed, method = "class")
+```
+
+```{r}
+#printing trees
+tree_summary_judgment
+plot(as.party(tree_summary_judgment), type = "simple")
+tree_settled
+plot(as.party(tree_settled))
+tree_dismissed
+plot(as.party(tree_dismissed))
+```
+
+```{r}
+#growing forrest
+rf_summary_judgment <- randomForest(summary_judgment ~ ., data = train_summary_judgment)
+rf_settled <- randomForest(settled ~ ., data = train_settled)
+rf_dismissed <- randomForest(dismissed ~ ., data = train_dismissed)
+```
+
+##b) [Level: Intermediate] Identify any relevant demographic features of a district/court venue that may influence the outcome of a case
+```{r}
 
 ```
 
 
-#Questions
+##c)[Level: Intermediate] Investigate any relationships that may exist between the outcome of a case and the various terminating motions that are made
+```{r}
 
-#Q4
-##a)
-
-
+```
 
 
+##d) [Level: Intermediate] Investigate any relationships that may exist between the outcome of a case and the various non-terminating motions that are made
+```{r}
+tree_summary_judgment_other <- rpart(summary_judgment ~ motion_type + filing_party + filed_before_joined +
+                                 decison + decided_before_joined + proceeding_precentile, 
+                               data = train_other, method = "class")
+
+tree_settled_other <- rpart(settled ~ motion_type + filing_party + filed_before_joined +
+                                 decison + decided_before_joined + proceeding_precentile, 
+                               data = train_other, method = "class")
+
+tree_dismissed_other <- rpart(dismissed ~ motion_type + filing_party + filed_before_joined +
+                                 decison + decided_before_joined + proceeding_precentile, 
+                               data = train_other, method = "class")
+```
+
+```{r}
+tree_summary_judgment_other
+plot(as.party(tree_summary_judgment_other), type = "simple")
+tree_settled_other
+plot(as.party(tree_settled_other))
+tree_dismissed_other
+plot(as.party(tree_dismissed_other))
+```
 
 
-
-
+##e) [Level: Intermediate] Identify any relationships that may exist between the outcome of a case and whether or not a non-terminating motion is granted/denied
 
 
 
