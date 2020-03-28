@@ -24,3 +24,8 @@ train_other_motions<-read.csv("train_other_motions.csv",header=TRUE)
 test_dockets<-read.csv("test_dockets.csv",header=TRUE)
 test_termination_motions<-read.csv("test_terminating_motions.csv",header=TRUE)
 test_other_motions<-read.csv("test_other_motions.csv",header=TRUE)
+
+
+
+
+
