@@ -26,6 +26,36 @@ test_termination_motions<-read.csv("test_terminating_motions.csv",header=TRUE)
 test_other_motions<-read.csv("test_other_motions.csv",header=TRUE)
 
 
+#Check unique
+train_dockets%>%
+  group_by(mudac_id)%>%
+  summarise(count=n())%>%
+  filter(count>0)
+
+train_other_motions%>%
+  group_by(mudac_id)%>%
+  summarise(count=n())%>%
+  filter(count>0)
+
+train_termination_motions%>%
+  group_by(mudac_id)%>%
+  summarise(count=n())%>%
+  filter(count>0)
+
+#check venues
+train_dockets%>%
+  group_by(circuit)%>%
+  summarise(count=n())%>%
+  filter(count>0)
+
+cuicuit_vs_district<-train_dockets%>%
+  group_by(district)%>%
+  summarise(count=n(),circuit=mean(circuit))%>%
+  filter(count>0)
+
+#
+
+
 
 
 
