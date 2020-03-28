@@ -18,7 +18,11 @@ library(Metrics)
 library(dplyr)
 library(corrplot)
 library(randomForest)
+library(stargazer)
 library(readr)
+library(Hmisc)
+install.packages("neuralnet")
+library(neuralnet)
 ```
 
 #loading data
@@ -31,7 +35,7 @@ test_termination_motions<-read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/t
 test_other_motions<-read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/test_other_motions.csv",header=TRUE)
 districts <- read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/districts.csv",header=TRUE)
 district_fips_code <- read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/district_fips_code.csv",header=TRUE)
-
+demographics_2015 <- read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/us-census-demographic-data/acs2015_census_tract_data.csv", header = TRUE)
 ```
 
 #Data manipulation
@@ -40,12 +44,21 @@ district_fips_code <- read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/distr
 train_dockets <- train_dockets %>% mutate(dismissed =ifelse(outcome == "Dismissed",1,0)) %>%
   mutate(summary_judgment = as.factor(summary_judgment), settled = as.factor(settled), dismissed =
            as.factor(dismissed))
+
+#demographics
+demographics_2015 <- demographics_2015 %>% separate(CensusTract, c("fips_code", "tract"), sep = 5) %>% mutate(fips_code = as.integer(fips_code)) %>% select(-c(tract, State, County))
+train_dockets_for_demog <- select(train_dockets, c(district, outcome, summary_judgment, settled, dismissed))
+colnames(train_dockets_for_demog)[1] <- "district_number"
+district_w_train_dockets <- full_join(train_dockets_for_demog, district_fips_code, by = "district_number")
+district_w_demog <- full_join(district_w_train_dockets, demographics_2015, by = c("fips_code"))
+district_w_demog_2010_pop <- full_join(district_w_demog, districts, by = c("district_number", "state"))
+train_dockets_w_demog <- full_join(district_w_demog_2010_pop, demographics_2015, by = "district_number")
 ```
 ##Merging
 ```{r}
-train_other <- full_join(train_dockets, train_other_motions, by = "mudac_id")
+train_other <- full_join(select(train_dockets, c(1,33:36)), train_other_motions, by = "mudac_id")
 
-train_termination <- full_join(train_dockets, train_termination_motions, by = "mudac_id")
+train_termination <- full_join(select(train_dockets, c(1,33:36)), train_termination_motions, by = "mudac_id")
 
 train_full <- full_join(train_dockets, train_other_motions, by = "mudac_id")
 train_full <- full_join(train_full, train_termination_motions, by = "mudac_id")
@@ -62,56 +75,140 @@ colnames(train_full)[37:46] <- c("other_motion_type", "other_filing_party", "oth
 ##a) [Level: Beginner/Intermediate] Identify characteristics of a case that appear to be indicative of a case’s outcome
 ###splitting data
 ```{r}
-#growing trees
+#Using LM
+train_summary_judgment_lm <- glm(summary_judgment ~ ., data =train_summary_judgment, family = "binomial")
+train_settled_lm <- glm(settled ~ ., data =train_settled, family = "binomial")
+train_dismissed_lm <- glm(dismissed ~ ., data =train_dismissed, family = "binomial")
+
+stargazer(train_summary_judgment_lm, train_settled_lm, train_dismissed_lm, type = "text")
+```
+
+
+
+##b) [Level: Intermediate] Identify any relevant demographic features of a district/court venue that may influence the outcome of a case
+```{r}
+train_summary_judgment_demog <- district_w_demog %>% select(-c(outcome, settled, dismissed))
+
+train_settled_demog <- district_w_demog %>% select(-c(outcome, summary_judgment, dismissed))
+
+train_dismissed_demog <- district_w_demog %>% select(-c(outcome, settled, summary_judgment))
+
+demographics_summary_judgment_lm <- glm(summary_judgment ~ ., data = train_summary_judgment_demog, family = "binomial")
+demographics_settled_lm <- glm(settled ~ ., data = train_settled_demog, family = "binomial")
+demographics_dismissed_lm <- glm(dismissed ~ ., data = train_dismissed_demog, family = "binomial")
+```
+
+
+##c)[Level: Intermediate] Investigate any relationships that may exist between the outcome of a case and the various terminating motions that are made
+```{r}
+lm_SJ_train_term <- glm(summary_judgment ~ motion_type, select(train_termination, -c(mudac_id, outcome,settled,dismissed)), family = "binomial")
+lm_set_train_term <- glm(settled ~ motion_type, select(train_termination, -c(mudac_id, outcome,summary_judgment,dismissed)), family = "binomial")
+lm_dis_train_term <- glm(dismissed ~ motion_type, select(train_termination, -c(mudac_id, outcome,settled,summary_judgment)), family = "binomial")
+
+stargazer(lm_SJ_train_term, lm_set_train_term, lm_dis_train_term, type = "text")
+```
+
+
+##d) [Level: Intermediate] Investigate any relationships that may exist between the outcome of a case and the various non-terminating motions that are made
+```{r}
+lm_SJ_train_oth <- glm(summary_judgment ~ motion_type, select(train_other, -c(mudac_id, outcome,settled,dismissed)), family = "binomial")
+lm_set_train_oth <- glm(settled ~ motion_type, select(train_other, -c(mudac_id, outcome,summary_judgment,dismissed)), family = "binomial")
+lm_dis_train_oth <- glm(dismissed ~ motion_type, select(train_other, -c(mudac_id, outcome,settled,summary_judgment)), family = "binomial")
+
+stargazer(lm_SJ_train_oth, lm_set_train_oth, lm_dis_train_oth, type = "text")
+```
+
+
+
+##e) [Level: Intermediate] Identify any relationships that may exist between the outcome of a case and whether or not a non-terminating motion is granted/denied
+```{r}
+train_other_decision_twoleveled <- train_other %>% filter(decison == c("Denied", "Denied as Moot", "Granted", "Granted in Part"))
+levels(train_other$decison)
+
+condense_decision <- function(x){
+  ifelse(x %in% c("Denied","Denied as Moot"), "Denied", "Granted")
+}
+
+train_other_decision_twoleveled$decison <- fct_relabel(train_other_decision_twoleveled$decison, condense_decision)
+
+lm_SJ_train_oth <- glm(summary_judgment ~ ., select(train_other_decision_twoleveled, c(summary_judgment, decison)), family = "binomial")
+lm_set_train_oth <- glm(settled ~ ., select(train_other_decision_twoleveled, c(settled, decison)), family = "binomial")
+lm_dis_train_oth <- glm(dismissed ~ ., select(train_other_decision_twoleveled, c(dismissed, decison)), family = "binomial")
+
+stargazer(lm_SJ_train_oth, lm_set_train_oth, lm_dis_train_oth, type = "text")
+```
+
+
+#Q5) [Level: Advanced] The MUDAC 2020 challenge includes a prediction component. This part of the competition will take place in Kaggle (additional information regarding Kaggle will be provided separately). MUDAC 2020 requires teams to build a predictive model that provides a probability that a case will be closed by a summary judgement and a second predictive model that provides a probability that a case will be closed by a settlement.
+
+##a) Model #1: Obtain a predicted probability that a case will be closed by a summary judgment
+###unpruned
+```{r}
+#Growing tree
 train_summary_judgment <- train_dockets %>% select(-c(outcome, settled, dismissed,mudac_id,primarytitle,nos_text))
 tree_summary_judgment <- rpart(summary_judgment ~ ., data = train_summary_judgment, method = "class")
 
-train_settled <- train_dockets %>% select(-c(outcome, summary_judgment, dismissed,mudac_id,primarytitle,nos_text))
-tree_settled <- rpart(settled ~ ., data = train_settled, method = "class")
-
-train_dismissed <- train_dockets %>% select(-c(outcome, settled, summary_judgment,mudac_id,primarytitle,nos_text))
-tree_dismissed <- rpart(dismissed ~ ., data = train_dismissed, method = "class")
-```
-
-```{r}
-#printing trees
-tree_summary_judgment
+#plotting tree
 plot(as.party(tree_summary_judgment), type = "simple")
-tree_settled
-plot(as.party(tree_settled))
-tree_dismissed
-plot(as.party(tree_dismissed))
-```
+preds_sj <- predict(tree_summary_judgment, type = "class")
 
-```{r}
-#tree quality
+# Adding predictions to the data set
+train_summary_judgment <- train_summary_judgment %>%
+  mutate(prediction = preds_sj)
+
+# Confusion matrix
 train_summary_judgment %>%
-  mutate(predictions = predict(tree_summary_judgment, newdata = train_summary_judgment, type = "class")) %>%
-  summarize(error = mean(summary_judgment != predictions))
-train_settled %>%
-  mutate(predictions = predict(tree_settled, newdata = train_settled, type = "class")) %>%
-  summarize(error = mean(settled != predictions))
-train_dismissed %>%
-  mutate(predictions = predict(tree_dismissed, newdata = train_dismissed, type = "class")) %>%
-  summarize(error = mean(summary_judgment != predictions))
+  rename(truth = summary_judgment) %>%
+  count(truth, prediction) %>%
+  spread(key = prediction, value = n)
+
+# accuracy
+train_summary_judgment_accuracy <- train_summary_judgment %>% summarise(accuracy = mean(summary_judgment == prediction))
+train_summary_judgment_accuracy
+
+# sensitivity
+train_summary_judgment_sens <- train_summary_judgment %>%   
+  summarise(sensitivity = sum(summary_judgment == "1" & prediction == "1") / 
+              sum(summary_judgment == "1"))
+train_summary_judgment_sens
+
+# specificity
+train_summary_judgment_spec <- train_summary_judgment %>% 
+  summarise(specificity = sum(summary_judgment == "0" & prediction == "0") / sum(summary_judgment == "0"))
+train_summary_judgment_spec
 ```
 
+###pruned
 ```{r}
-#growing forrest
-rf_summary_judgment <- randomForest(summary_judgment ~ ., data = train_summary_judgment)
-rf_settled <- randomForest(settled ~ ., data = train_settled)
-rf_dismissed <- randomForest(dismissed ~ ., data = train_dismissed)
+opt <- which.min(tree_summary_judgment$cptable[,"xerror"])
+opt_cp <- tree_summary_judgment$cptable[opt, "CP"]
+tree_summary_judgment_prune <- prune(tree_summary_judgment, cp = opt_cp)
+tree_summary_judgment_prune
+plot(as.party(tree_summary_judgment_prune), type = "simple")
+
+tree_summary_judgment <- rpart(summary_judgment ~ ., data = train_summary_judgment, method = "class", 
+                       control = rpart.control(cp = 0.04))
+plot(as.party(tree_summary_judgment), type = "simple")
+
+printcp(tree_summary_judgment)
+plotcp(tree_summary_judgment)
 ```
 
+###Random Forrest
 ```{r}
-#printing forrest
-rf_summary_judgment
-rf_settled
-rf_dismissed
+bagged_summary_judgment_tree <- randomForest(summary_judgment ~ ., data = train_summary_judgment, mtry = 30)
+bagged_summary_judgment_tree
+
+rf_summary_judgment_tree <- randomForest(summary_judgment ~ ., data = train_summary_judgment, mtry = sqrt(30))
+rf_summary_judgment_tree
 ```
 
+
+
+
+
 ```{r}
-test_ %>%
+test %>%
   mutate(
     pred.bag = predict(bagged_tree, newdata = test, type = "class"),
     pred.rf =  predict(rand_forest, newdata = test, type = "class") 
@@ -122,47 +219,73 @@ test_ %>%
   )
 ```
 
-
-
-##b) [Level: Intermediate] Identify any relevant demographic features of a district/court venue that may influence the outcome of a case
+##b) Model #2: Obtain a predicted probability that a case will be closed by a settlement
+###unpruned
 ```{r}
-demographics_lm <- glm(outcome ~ circut + district + office + )
+#Growing tree
+train_settled <- train_dockets %>% select(-c(outcome, summary_judgment, dismissed,mudac_id,primarytitle,nos_text))
+tree_settled <- rpart(settled ~ ., data = train_settled, method = "class")
+
+#plotting tree
+plot(as.party(tree_settled), type = "simple")
+preds_settled <- predict(tree_settled, type = "class")
+
+# Adding predictions to the data set
+train_settled <- train_settled %>%
+  mutate(prediction = preds_settled)
+
+# Confusion matrix
+train_settled %>%
+  rename(truth = settled) %>%
+  count(truth, prediction) %>%
+  spread(key = prediction, value = n)
+
+# accuracy
+train_settled_accuracy <- train_settled %>% summarise(accuracy = mean(settled == prediction))
+train_settled_accuracy
+
+# sensitivity
+train_settled_sens <- train_settled %>%   
+  summarise(sensitivity = sum(settled == "1" & prediction == "1") / 
+              sum(settled == "1"))
+train_settled_sens
+
+# specificity
+train_settled_spec <- train_settled %>% 
+  summarise(specificity = sum(settled == "0" & prediction == "0") / sum(settled == "0"))
+train_settled_spec
 ```
 
-
-##c)[Level: Intermediate] Investigate any relationships that may exist between the outcome of a case and the various terminating motions that are made
+###pruned
 ```{r}
+opt <- which.min(tree_settled$cptable[,"xerror"])
+opt_cp <- tree_settled$cptable[opt, "CP"]
+tree_settled_prune <- prune(tree_settled, cp = opt_cp)
+tree_settled_prune
+plot(as.party(tree_settled_prune), type = "simple")
 
+tree_settled <- rpart(settled ~ ., data = train_settled, method = "class", 
+                       control = rpart.control(cp = 0.04))
+plot(as.party(tree_settled), type = "simple")
+
+printcp(tree_settled)
+plotcp(tree_settled)
 ```
 
-
-##d) [Level: Intermediate] Investigate any relationships that may exist between the outcome of a case and the various non-terminating motions that are made
+###Random Forrest
 ```{r}
-tree_summary_judgment_other <- rpart(summary_judgment ~ motion_type + filing_party + filed_before_joined +
-                                 decison + decided_before_joined + proceeding_precentile, 
-                               data = train_other, method = "class")
+bagged_settled_tree <- randomForest(settled ~ ., data = train_settled, mtry = 30)
+bagged_settled_tree
 
-tree_settled_other <- rpart(settled ~ motion_type + filing_party + filed_before_joined +
-                                 decison + decided_before_joined + proceeding_precentile, 
-                               data = train_other, method = "class")
-
-tree_dismissed_other <- rpart(dismissed ~ motion_type + filing_party + filed_before_joined +
-                                 decison + decided_before_joined + proceeding_precentile, 
-                               data = train_other, method = "class")
+rf_settled_tree <- randomForest(settled ~ ., data = train_settled, mtry = sqrt(30))
+rf_settled_tree
 ```
 
+###Neural Net
 ```{r}
-tree_summary_judgment_other
-plot(as.party(tree_summary_judgment_other), type = "simple")
-tree_settled_other
-plot(as.party(tree_settled_other))
-tree_dismissed_other
-plot(as.party(tree_dismissed_other))
+settled_nn <- neuralnet(settled~.,data=train_settled, hidden=31, act.fct = "logistic",
+                linear.output = FALSE)
 ```
-
-
-##e) [Level: Intermediate] Identify any relationships that may exist between the outcome of a case and whether or not a non-terminating motion is granted/denied
-
 
 
 
