@@ -90,8 +90,22 @@ grid.arrange(p3, p4, nrow = 1)
 
 #modify for demographic
 
-df.full_FIPS <- select_(train_dockets, "filers_county", "highOrLow")
-df.freq_tmp <- as.data.frame(table(df.full_FIPS))
+df.full_FIPS <- select_(train_dockets, "filers_county", "highOrLow","district")
+#cleaning government's filing
+tmp_df.full_FIPS <- data.frame(matrix(ncol=3, nrow=0))
+name <- c("filers_county", "highOrLow")
+colnames(tmp_df.full_FIPS) <- name
+
+for(i in 1:dim(df.full_FIPS)[1]){
+  for(j in 1:dim(district_fips_code)[1]){
+    if ((df.full_FIPS$filers_county[i] == district_fips_code$fips_code[j]) & 
+      (df.full_FIPS$district[i] == district_fips_code$district_number[j])){
+        tmp_df.full_FIPS <- rbind(tmp_df.full_FIPS, df.full_FIPS[i, 1:2])
+    }
+  }
+}
+
+df.freq_tmp <- as.data.frame(table(tmp_df.full_FIPS))
 
 #cleaning modified data
 df.freq_full_FIPS <- data.frame(matrix(ncol=3, nrow=0))
