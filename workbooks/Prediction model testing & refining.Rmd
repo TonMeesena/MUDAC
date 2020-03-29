@@ -24,3 +24,331 @@ library(Hmisc)
 library(neuralnet)
 ```
 
+#loading data
+```{r}
+train_dockets <- read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/train_dockets.csv")
+train_termination_motions<-read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/train_terminating_motions.csv")
+train_other_motions<-read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/train_other_motions.csv",header=TRUE)
+test_dockets<-read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/test_dockets.csv",header=TRUE)
+test_termination_motions<-read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/test_terminating_motions.csv",header=TRUE)
+test_other_motions<-read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/test_other_motions.csv",header=TRUE)
+districts <- read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/districts.csv",header=TRUE)
+district_fips_code <- read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/district_fips_code.csv",header=TRUE)
+```
+
+#Wrangling
+```{r}
+#training set
+train_dockets <- train_dockets %>%
+  mutate(summary_judgment = as.factor(summary_judgment), settled = as.factor(settled))
+
+train_other <- full_join(select(train_dockets, c(1,33:35)), train_other_motions, by = "mudac_id")
+
+train_termination <- full_join(select(train_dockets, c(1,33:35)), train_termination_motions, by = "mudac_id")
+
+
+train_full <- left_join(train_dockets, train_other_motions, by = "mudac_id")
+train_full <- left_join(train_full, train_termination_motions, by = "mudac_id")
+colnames(train_full)[36:45] <- c("other_motion_type", "other_filing_party", "other_filed_before_joined",
+                                 "other_decision", "other_decided_before_joined", "other_proceeding_percentile",
+                                 "termination_motion_type", "termination_filing_party",
+                                 "termination_filed_before_joined", "termination_proceeding_percentile")
+
+#test set
+test_full <- left_join(test_dockets, test_other_motions, by = "mudac_id")
+test_full <- left_join(test_full, test_termination_motions, by = "mudac_id")
+colnames(test_full)[32:41] <- c("other_motion_type", "other_filing_party", "other_filed_before_joined",
+                                 "other_decision", "other_decided_before_joined", "other_proceeding_percentile",
+                                 "termination_motion_type", "termination_filing_party",
+                                 "termination_filed_before_joined", "termination_proceeding_percentile")
+```
+
+#Creating Validation and Training
+```{r}
+colnames(train_full)
+train_set <- train_dockets %>% sample_frac(0.75) %>% select(-c(outcome, mudac_id, primarytitle, nos_text))
+val_set <- train_dockets %>% select(-c(outcome, mudac_id, primarytitle, nos_text)) %>% setdiff(train_set)
+```
+
+#Constructing Models
+```{r}
+#decision trees
+#unpruned
+
+tree_train_sj <- rpart(summary_judgment ~ . -c(settled), data = train_set, method = "class")
+tree_train_settled <- rpart(settled ~ . -c(summary_judgment), data = train_set, method = "class")
+
+#10-fold CV
+
+#bag and forrest
+bagged_train_sj <- randomForest(summary_judgment ~ . -c(settled), data = train_set, mtry = 29)
+bagged_train_settled <- randomForest(settled ~ . -c(summary_judgment), data = train_set, mtry = 29)
+
+rf_train_sj <- randomForest(summary_judgment ~ . -c(settled), data = train_set, mtry = sqrt(29))
+rf_train_settled <- randomForest(settled ~ . -c(summary_judgment), data = train_set, mtry = sqrt(29))
+```
+
+#Comparing Accuracy
+```{r}
+train_set %>%
+  mutate(predictions_sj_tree = predict(tree_train_sj, newdata = train_set, type = "class"),
+         predictions_settled_tree = predict(tree_train_settled, newdata = train_set, type = "class"),
+         predictions_sj_bagged = predict(bagged_train_sj, newdata = train_set, type = "class"),
+         predictions_settled_bagged = predict(bagged_train_settled, newdata = train_set, type = "class"),
+         predictions_sj_rf = predict(rf_train_sj, newdata = train_set, type = "class"),
+         predictions_settled_rf = predict(rf_train_settled, newdata = train_set, type = "class")) %>%
+  summarise(sj_tree_error = mean(summary_judgment != predictions_sj_tree),
+            settled_tree_error = mean(settled != predictions_settled_tree),
+            sj_bagged_error = mean(summary_judgment != predictions_sj_bagged),
+            settled_bagged_error = mean(settled != predictions_settled_bagged),
+            sj_rf_error = mean(summary_judgment != predictions_sj_rf),
+            settled_rf_error = mean(settled != predictions_settled_rf))
+
+val_set %>%
+  mutate(predictions_sj_tree = predict(tree_train_sj, newdata = val_set, type = "class"),
+         predictions_settled_tree = predict(tree_train_settled, newdata = val_set, type = "class"),
+         predictions_sj_bagged = predict(bagged_train_sj, newdata = val_set, type = "class"),
+         predictions_settled_bagged = predict(bagged_train_settled, newdata = val_set, type = "class"),
+         predictions_sj_rf = predict(rf_train_sj, newdata = val_set, type = "class"),
+         predictions_settled_rf = predict(rf_train_settled, newdata = val_set, type = "class")) %>%
+  summarise(sj_tree_error = mean(summary_judgment != predictions_sj_tree),
+            settled_tree_error = mean(settled != predictions_settled_tree),
+            sj_bagged_error = mean(summary_judgment != predictions_sj_bagged),
+            settled_bagged_error = mean(settled != predictions_settled_bagged),
+            sj_rf_error = mean(summary_judgment != predictions_sj_rf),
+            settled_rf_error = mean(settled != predictions_settled_rf))
+```
+
+#Determining Proportion accuracy
+```{r}
+preds_sj <- predict(rf_train_sj, train_set, type = "prob")
+submission_for_training_sj <- train_set %>% select(summary_judgment) %>%
+  mutate(prob_sj = preds_sj[,2], class_sj = ifelse(preds_sj[,2]>0.5,1,0))
+submission_for_training_sj
+
+preds_sj_val <- predict(rf_train_sj, val_set, type = "prob")
+submission_for_testing_sj <- val_set %>% select(summary_judgment) %>%
+  mutate(prob_sj_val = preds_sj_val[,2], class_sj_val = ifelse(preds_sj_val[,2]>0.5,1,0))
+submission_for_testing_sj
+
+preds_settled <- predict(rf_train_settled, train_set, type = "prob")
+submission_for_training_settled <- train_set %>% select(settled) %>%
+  mutate(prob_settled = preds_settled[,2], class_settled = ifelse(preds_settled[,2]>0.5,1,0))
+submission_for_training_settled
+
+preds_settled_val <- predict(rf_train_settled, val_set, type = "prob")
+submission_for_testing_settled <- val_set %>% select(settled) %>%
+  mutate(prob_settled_val = preds_settled_val[,2], class_settled_val = ifelse(preds_settled_val[,2]>0.5,1,0))
+submission_for_testing_settled
+
+# accuracy
+preds_sj_accuracy <- submission_for_training_sj %>% summarise(accuracy = mean(class_sj == summary_judgment))
+preds_sj_accuracy
+
+preds_settled_accuracy <- submission_for_training_settled %>% summarise(accuracy = mean(class_settled == settled))
+preds_settled_accuracy
+
+preds_sj_val_accuracy <- submission_for_testing_sj %>% summarise(accuracy = mean(class_sj_val == summary_judgment))
+preds_sj_val_accuracy
+
+preds_settled_val_accuracy <- submission_for_testing_settled %>% summarise(accuracy = mean(class_settled_val == settled))
+preds_settled_val_accuracy
+
+# sensitivity
+preds_sj_sensitivity <- submission_for_training_sj %>% summarise(sensitivity = sum((class_sj == 1 & summary_judgment == 1))/sum(summary_judgment == 1))
+preds_sj_sensitivity
+
+preds_settled_sensitivity <- submission_for_training_settled %>% summarise(sensitivity = sum((class_settled == 1 & settled == 1))/sum(settled == 1))
+preds_settled_sensitivity
+
+preds_sj_val_sensitivity <- submission_for_testing_sj %>% summarise(sensitivity = sum((class_sj_val == 1 & summary_judgment == 1))/sum(summary_judgment == 1))
+preds_sj_val_sensitivity
+
+preds_settled_val_sensitivity <- submission_for_testing_settled %>% summarise(sensitivity = sum((class_settled_val == 1 & settled == 1))/sum(settled == 1))
+preds_settled_val_sensitivity
+
+# specificity
+preds_sj_specificity <- submission_for_training_sj %>% summarise(specificity = sum((class_sj == 0 & summary_judgment == 0))/sum(summary_judgment == 0))
+preds_sj_specificity
+
+preds_settled_specificity <- submission_for_training_settled %>% summarise(specificity = sum((class_settled == 0 & settled == 0))/sum(settled == 0))
+preds_settled_specificity
+
+preds_sj_val_specificity <- submission_for_testing_sj %>% summarise(specificity = sum((class_sj_val == 0 & summary_judgment == 0))/sum(summary_judgment == 0))
+preds_sj_val_specificity
+
+preds_settled_val_specificity <- submission_for_testing_settled %>% summarise(specificity = sum((class_settled_val == 0 & settled == 0))/sum(settled == 0))
+preds_settled_val_specificity
+```
+
+
+
+#NN
+###Neural Net
+```{r}
+#training
+apply(train_set,2,function(x) sum(is.na(x)))
+
+model_matrix <- model.matrix( 
+  ~ ., 
+  data = train_set
+)
+colnames(model_matrix)
+
+colnames(model_matrix)[56] <- "additional_nosPrisoner_Civil_Rights_510"
+
+#run as many times as needed to remove all white space and other bugs
+for(i in 1:86){
+  colnames(model_matrix)[i] <- sub(" ","_",colnames(model_matrix)[i])
+  colnames(model_matrix)[i] <- sub("-","",colnames(model_matrix)[i])
+  colnames(model_matrix)[i] <- sub("&","and",colnames(model_matrix)[i])
+  colnames(model_matrix)[i] <- sub("\\(","",colnames(model_matrix)[i])
+  colnames(model_matrix)[i] <- sub(")","",colnames(model_matrix)[i])
+}
+
+colnames(model_matrix)
+
+col_list <- paste(c(colnames(model_matrix[,-c(1,87,88)])),collapse="+")
+sj_col_list <- paste(c("summary_judgment1~",col_list),collapse="")
+settled_col_list <- paste(c("settled1~",col_list),collapse="")
+settled_nn_formula <- formula(settled_col_list)
+sj_nn_formula <- formula(sj_col_list)
+
+sj_nn <- neuralnet(sj_col_list,data=model_matrix, hidden=5, act.fct = "logistic",
+                linear.output = FALSE)
+plot(sj_nn)
+settled_nn <- neuralnet(settled_col_list,data=model_matrix, hidden=5, act.fct = "logistic",
+                linear.output = FALSE)
+plot(settled_nn)
+
+sj_nn_backprop <- neuralnet(sj_col_list, data=model_matrix,
+                            algorithm = "backprop",
+                            hidden=c(10,3),
+                            learningrate = 0.0000001)
+
+
+#validation
+val_matrix <- model.matrix( 
+  ~ ., 
+  data = val_set
+)
+colnames(val_matrix)
+
+colnames(val_matrix)[56] <- "additional_nosPrisoner_Civil_Rights_510"
+
+#run as many times as needed to remove all white space and other bugs
+for(i in 1:86){
+  colnames(val_matrix)[i] <- sub(" ","_",colnames(val_matrix)[i])
+  colnames(val_matrix)[i] <- sub("-","",colnames(val_matrix)[i])
+  colnames(val_matrix)[i] <- sub("&","and",colnames(val_matrix)[i])
+  colnames(val_matrix)[i] <- sub("\\(","",colnames(val_matrix)[i])
+  colnames(val_matrix)[i] <- sub(")","",colnames(val_matrix)[i])
+}
+
+colnames(val_matrix)
+
+prediction_sj_nn <- compute(sj_nn_2,val_matrix[,-c(1,87,88)])
+prediction_sj_nn$net.result
+
+prediction_settled_nn <- compute(settled_nn,val_matrix[,-c(1,87,88)])
+prediction_settled_nn$net.result
+
+pred <- ifelse(prediction_settled_nn$net.result>0.5, 1, 0)
+pred
+```
+
+
+
+#Generating Actual predictions
+##only dockets
+```{r}
+training_set <- train_dockets %>% select(-c(outcome, mudac_id, primarytitle, nos_text))
+test_set <- test_dockets %>% select(-c(mudac_id, nos_text))
+
+rf_train_sj <- randomForest(summary_judgment ~ ., data = select(training_set, -c(settled)), mtry = sqrt(29))
+rf_train_settled <- randomForest(settled ~ ., data = select(training_set,-c(summary_judgment)), mtry = sqrt(29))
+
+levels(test_set$statute) <- levels(training_set$statute)
+levels(test_set$protected_class) <- levels(training_set$protected_class)
+levels(test_set$additional_nos) <- levels(training_set$additional_nos)
+levels(test_set$jury_demand) <- levels(training_set$jury_demand)
+levels(test_set$informa_pauperis) <- levels(training_set$informa_pauperis)
+levels(test_set$class_action) <- levels(training_set$class_action)
+levels(test_set$arbitration_at_filing) <- levels(training_set$arbitration_at_filing)
+levels(test_set$issue_joined) <- levels(training_set$issue_joined)
+levels(test_set$pretrial_conf) <- levels(training_set$pretrial_conf)
+
+preds_sj_test <- predict(rf_train_sj, test_set, type = "prob")
+preds_settled_test <- predict(rf_train_settled, test_set, type = "prob")
+submission_for_testing <- test_dockets %>% select(mudac_id) %>%
+  mutate(SummaryJudgment = preds_sj_test[,2], Settled = preds_settled_test[,2])
+submission_for_testing %>% arrange(desc(mudac_id))
+submission_table<- submission_for_testing %>% gather("outcome", "probability", -mudac_id) %>% arrange(desc(mudac_id)) %>% mutate(id = paste(mudac_id,outcome, sep = "-")) %>% select(id, probability)
+submission_table
+
+write.csv(submission_table,"C:/Users/asus/Dropbox/MUDAC/MUDAC/Predictions/carleton.edu_Team_01.csv", row.names = FALSE)
+```
+
+
+##full training/testing sets
+```{r}
+training_set <- train_dockets %>% select(-c(outcome, mudac_id, primarytitle, nos_text))
+test_set <- test_dockets %>% select(-c(mudac_id, nos_text))
+
+rf_train_sj <- randomForest(summary_judgment ~ ., data = select(training_set, -c(settled)), mtry = sqrt(29))
+rf_train_settled <- randomForest(settled ~ ., data = select(training_set,-c(summary_judgment)), mtry = sqrt(29))
+
+levels(test_set$statute) <- levels(training_set$statute)
+levels(test_set$protected_class) <- levels(training_set$protected_class)
+levels(test_set$additional_nos) <- levels(training_set$additional_nos)
+levels(test_set$jury_demand) <- levels(training_set$jury_demand)
+levels(test_set$informa_pauperis) <- levels(training_set$informa_pauperis)
+levels(test_set$class_action) <- levels(training_set$class_action)
+levels(test_set$arbitration_at_filing) <- levels(training_set$arbitration_at_filing)
+levels(test_set$issue_joined) <- levels(training_set$issue_joined)
+levels(test_set$pretrial_conf) <- levels(training_set$pretrial_conf)
+
+preds_sj_test <- predict(rf_train_sj, test_set, type = "prob")
+preds_settled_test <- predict(rf_train_settled, test_set, type = "prob")
+submission_for_testing <- test_dockets %>% select(mudac_id) %>%
+  mutate(SummaryJudgment = preds_sj_test[,2], Settled = preds_settled_test[,2])
+submission_for_testing %>% arrange(desc(mudac_id))
+submission_table<- submission_for_testing %>% gather("outcome", "probability", -mudac_id) %>% arrange(desc(mudac_id)) %>% mutate(id = paste(mudac_id,outcome, sep = "-")) %>% select(id, probability)
+submission_table
+
+write.csv(submission_table,"C:/Users/asus/Dropbox/MUDAC/MUDAC/Predictions/carleton.edu_Team_01.csv", row.names = FALSE)
+```
+
+
+
+
+
+```{r}
+preds_sj_test <- predict(rf_train_sj, test_set, type = "prob")
+submission_for_testing <- test_dockets %>% select(mudac_id) %>%
+  mutate(SummaryJudgment = preds_sj_test[,2], class_sj_val = ifelse(preds_sj_val[,2]>0.5,1,0))
+submission_for_testing_sj
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
