@@ -4,6 +4,16 @@ author: "Noam Benkler"
 date: "March 28, 2020"
 output: html_document
 ---
+```{r}
+data$favor <- mutate(data$favor, 
+                     if("filing party" =="Plaintiff" && decision == "Granted"|
+                        "filing party" =="Defendant" && decision == "Denied"){"Plaintiff"
+                       }else if("filing party"=="Defendant" && decision == "Granted"|
+                                "filing party"=="Plaintiff" && decision == "Denied"){"Defendant"
+                         }else{NA})
+```
+
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -58,6 +68,7 @@ train_dockets_w_demog <- full_join(district_w_demog_2010_pop, demographics_2015,
 train_other <- full_join(select(train_dockets, c(1,33:36)), train_other_motions, by = "mudac_id")
 
 train_termination <- full_join(select(train_dockets, c(1,33:36)), train_termination_motions, by = "mudac_id")
+
 
 train_full <- full_join(train_dockets, train_other_motions, by = "mudac_id")
 train_full <- full_join(train_full, train_termination_motions, by = "mudac_id")
@@ -407,7 +418,8 @@ rf_settled_tree
 preds_settled <- predict(rf_settled_tree, train_settled, type = "prob")
 submission_for_training <- submission_for_training %>%
   mutate(prob_settled = preds_settled[,2])
-submission_for_training
+colnames(submission_for_training) <- c("mudac_id", "SummaryJudgment", "Settled")
+submission_for_training %>% gather("outcome", "Probability", -mudac_id) %>% arrange(mudac_id) %>% mutate(id = paste(mudac_id,outcome, sep = "-")) %>% select(id, Probability) %>% arrange(desc(id))
 
 preds_settled_test <- predict(rf_settled_tree, test_settled, type = "prob")
 submission_for_testing <- submission_for_testing %>%
@@ -415,8 +427,7 @@ submission_for_testing <- submission_for_testing %>%
 submission_for_testing
 
 colnames(submission_for_testing) <- c("mudac_id", "SummaryJudgment", "Settled")
-submission_for_testing  %>% gather("outcome", "Probability", -mudac_id) %>% arrange(mudac_id) %>% mutate(id = paste(mudac_id,outcome)) %>% select(id, Probability)
-
+submission_for_testing  %>% gather("outcome", "Probability", -mudac_id) %>% arrange(mudac_id) %>% mutate(id = paste(mudac_id,outcome, sep = "-")) %>% select(id, Probability) %>% arrange(desc(id))
 ```
 
 
