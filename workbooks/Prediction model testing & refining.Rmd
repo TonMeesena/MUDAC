@@ -14,6 +14,7 @@ library(tidyverse)
 library(partykit)
 library(rpart)
 library(caret)
+library(biglm)
 library(Metrics)
 library(dplyr)
 library(corrplot)
@@ -22,6 +23,7 @@ library(stargazer)
 library(readr)
 library(Hmisc)
 library(neuralnet)
+library(glmnet)
 ```
 
 #loading data
@@ -34,43 +36,74 @@ test_termination_motions<-read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/t
 test_other_motions<-read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/test_other_motions.csv",header=TRUE)
 districts <- read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/districts.csv",header=TRUE)
 district_fips_code <- read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/district_fips_code.csv",header=TRUE)
+demographics_2015 <- read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/us-census-demographic-data/acs2015_county_data.csv",header=TRUE)
 ```
 
 #Wrangling
+```{r}
+#demographics
+demographics <- left_join(district_fips_code, demographics_2015, by = c("fips_code" = "CensusId", 
+                                                                        "county" = "County",
+                                                                        "state" = "State")) %>%
+  mutate(county = as.factor(county), state = as.factor(state))
+
+demographics <- left_join(demographics, districts, by = c("district_number", "state"))
+demographics <- mutate(Men = Men/TotalPop, Women = Women/TotalPop, Hispanic = Hispanic*0.01, White = White*0.01, )
+
+demographics_matrix <- data.matrix(demographics)
+```
+
 ```{r}
 #training set
 train_dockets <- train_dockets %>%
   mutate(summary_judgment = as.factor(summary_judgment), settled = as.factor(settled))
 
-train_other <- full_join(select(train_dockets, c(1,33:35)), train_other_motions, by = "mudac_id")
+train_other <- left_join(select(train_dockets, c(1,33:35)), train_other_motions, by = "mudac_id")
 
-train_termination <- full_join(select(train_dockets, c(1,33:35)), train_termination_motions, by = "mudac_id")
+train_termination <- left_join(select(train_dockets, c(1,33:35)), train_termination_motions, by = "mudac_id")
 
+train_demographics_simpl <- left_join(select(train_dockets, c(1,3,33:35)), demographics, by = 
+                                  c("district" = "district_number"))
+
+train_demographics <- left_join(train_dockets, demographics, by = 
+                                  c("district" = "district_number"))
+
+FUUUUUUUUUUUUCK <- full_join(train_other_motions, train_termination_motions)
+
+SHIIIIIIIIIIIT <- left_join(train_dockets, FUUUUUUUUUUUUCK, by = "mudac_id")
+
+BIIIIIIIIIITCH <- apply(SHIIIIIIIIIIIT, 2, function(x) sum(is.na(x)))
 
 train_full <- left_join(train_dockets, train_other_motions, by = "mudac_id")
 train_full <- left_join(train_full, train_termination_motions, by = "mudac_id")
+train_full <- left_join(train_full, demographics, by = c("district" = "district_number"))
 colnames(train_full)[36:45] <- c("other_motion_type", "other_filing_party", "other_filed_before_joined",
                                  "other_decision", "other_decided_before_joined", "other_proceeding_percentile",
                                  "termination_motion_type", "termination_filing_party",
                                  "termination_filed_before_joined", "termination_proceeding_percentile")
 
 #test set
+test_demographics <- left_join(test_dockets, demographics, by = 
+                                  c("district" = "district_number"))
+
 test_full <- left_join(test_dockets, test_other_motions, by = "mudac_id")
 test_full <- left_join(test_full, test_termination_motions, by = "mudac_id")
+test_full <- left_join(test_full, demographics, by = c("district" = "district_number"))
 colnames(test_full)[32:41] <- c("other_motion_type", "other_filing_party", "other_filed_before_joined",
                                  "other_decision", "other_decided_before_joined", "other_proceeding_percentile",
                                  "termination_motion_type", "termination_filing_party",
                                  "termination_filed_before_joined", "termination_proceeding_percentile")
 ```
 
-#Creating Validation and Training
+#Dockets
+##Creating Validation and Training
 ```{r}
 colnames(train_full)
 train_set <- train_dockets %>% sample_frac(0.75) %>% select(-c(outcome, mudac_id, primarytitle, nos_text))
 val_set <- train_dockets %>% select(-c(outcome, mudac_id, primarytitle, nos_text)) %>% setdiff(train_set)
 ```
 
-#Constructing Models
+##Constructing Models
 ```{r}
 #decision trees
 #unpruned
@@ -88,7 +121,7 @@ rf_train_sj <- randomForest(summary_judgment ~ . -c(settled), data = train_set, 
 rf_train_settled <- randomForest(settled ~ . -c(summary_judgment), data = train_set, mtry = sqrt(29))
 ```
 
-#Comparing Accuracy
+##Comparing Accuracy
 ```{r}
 train_set %>%
   mutate(predictions_sj_tree = predict(tree_train_sj, newdata = train_set, type = "class"),
@@ -119,7 +152,7 @@ val_set %>%
             settled_rf_error = mean(settled != predictions_settled_rf))
 ```
 
-#Determining Proportion accuracy
+##Determining Proportion accuracy
 ```{r}
 preds_sj <- predict(rf_train_sj, train_set, type = "prob")
 submission_for_training_sj <- train_set %>% select(summary_judgment) %>%
@@ -183,7 +216,7 @@ preds_settled_val_specificity
 
 
 
-#NN
+##NN
 ###Neural Net
 ```{r}
 #training
@@ -259,6 +292,8 @@ pred
 
 
 
+
+
 #Generating Actual predictions
 ##only dockets
 ```{r}
@@ -290,28 +325,95 @@ write.csv(submission_table,"C:/Users/asus/Dropbox/MUDAC/MUDAC/Predictions/carlet
 ```
 
 
-##full training/testing sets
 ```{r}
-training_set <- train_dockets %>% select(-c(outcome, mudac_id, primarytitle, nos_text))
-test_set <- test_dockets %>% select(-c(mudac_id, nos_text))
-
-rf_train_sj <- randomForest(summary_judgment ~ ., data = select(training_set, -c(settled)), mtry = sqrt(29))
-rf_train_settled <- randomForest(settled ~ ., data = select(training_set,-c(summary_judgment)), mtry = sqrt(29))
-
-levels(test_set$statute) <- levels(training_set$statute)
-levels(test_set$protected_class) <- levels(training_set$protected_class)
-levels(test_set$additional_nos) <- levels(training_set$additional_nos)
-levels(test_set$jury_demand) <- levels(training_set$jury_demand)
-levels(test_set$informa_pauperis) <- levels(training_set$informa_pauperis)
-levels(test_set$class_action) <- levels(training_set$class_action)
-levels(test_set$arbitration_at_filing) <- levels(training_set$arbitration_at_filing)
-levels(test_set$issue_joined) <- levels(training_set$issue_joined)
-levels(test_set$pretrial_conf) <- levels(training_set$pretrial_conf)
-
 preds_sj_test <- predict(rf_train_sj, test_set, type = "prob")
-preds_settled_test <- predict(rf_train_settled, test_set, type = "prob")
 submission_for_testing <- test_dockets %>% select(mudac_id) %>%
-  mutate(SummaryJudgment = preds_sj_test[,2], Settled = preds_settled_test[,2])
+  mutate(SummaryJudgment = preds_sj_test[,2], class_sj_val = ifelse(preds_sj_val[,2]>0.5,1,0))
+submission_for_testing_sj
+```
+
+
+
+
+##full dataset
+```{r}
+training_set_full <- train_demographics %>% select(-c(outcome, mudac_id, primarytitle, nos_text, 36:45))
+test_set_full <- test_demographics %>% select(-c(mudac_id, nos_text, 32:41))
+
+apply(training_set_full[,32:39],2,function(x) sum(is.na(x)))
+apply(training_set_full[,1:31],2,function(x) sum(is.na(x)))
+apply(training_set_full[,40:78],2,function(x) sum(is.na(x)))
+
+full_rf_train_sj <- randomForest(summary_judgment ~ ., data = select(training_set_full, -c(settled)), mtry = sqrt(68))
+full_full_rf_train_settled <- randomForest(settled ~ ., data = select(training_set_full,-c(summary_judgment)), mtry = sqrt(68))
+
+levels(test_set_full$statute) <- levels(training_set_full$statute)
+levels(test_set_full$protected_class) <- levels(training_set_full$protected_class)
+levels(test_set_full$additional_nos) <- levels(training_set_full$additional_nos)
+levels(test_set_full$jury_demand) <- levels(training_set_full$jury_demand)
+levels(test_set_full$informa_pauperis) <- levels(training_set_full$informa_pauperis)
+levels(test_set_full$class_action) <- levels(training_set_full$class_action)
+levels(test_set_full$arbitration_at_filing) <- levels(training_set_full$arbitration_at_filing)
+levels(test_set_full$issue_joined) <- levels(training_set_full$issue_joined)
+levels(test_set_full$pretrial_conf) <- levels(training_set_full$pretrial_conf)
+levels(test_set_full$other_motion_type) <- levels(training_set_full$other_motion_type)
+levels(test_set_full$other_filing_party) <- levels(training_set_full$other_filing_party)
+levels(test_set_full$other_filed_before_joined) <- levels(training_set_full$other_filed_before_joined)
+levels(test_set_full$termination_motion_type) <- levels(training_set_full$termination_motion_type)
+levels(test_set_full$termination_filing_party) <- levels(termination_set_full$termination_filing_party)
+levels(test_set_full$termination_filed_before_joined) <- levels(training_set_full$termination_filed_before_joined)
+levels(test_set_full$county) <- levels(training_set_full$county)
+levels(test_set_full$state) <- levels(training_set_full$state)
+levels(test_set_full$district_name) <- levels(training_set_full$district_name)
+
+full_preds_sj_test <- predict(full_rf_train_sj, test_set_full, type = "prob")
+full_preds_settled_test <- predict(full_rf_train_settled, test_set_full, type = "prob")
+submission_for_testing <- test_dockets %>% select(mudac_id) %>%
+  mutate(SummaryJudgment = full_preds_sj_test[,2], Settled = full_preds_settled_test[,2])
+submission_for_testing %>% arrange(desc(mudac_id))
+submission_table<- submission_for_testing %>% gather("outcome", "probability", -mudac_id) %>% arrange(desc(mudac_id)) %>% mutate(id = paste(mudac_id,outcome, sep = "-")) %>% select(id, probability)
+submission_table
+
+write.csv(submission_table,"C:/Users/asus/Dropbox/MUDAC/MUDAC/Predictions/carleton.edu_Team_23.csv", row.names = FALSE)
+```
+
+##demographic dataset
+```{r}
+training_set_dem <- train_demographics %>% select(-c(outcome, mudac_id, primarytitle, nos_text)) %>% 
+  mutate(county = as.character(county))
+test_set_dem <- test_demographics %>% select(-c(mudac_id, nos_text)) %>% 
+  mutate(county = as.character(county))
+
+apply(training_set_dem[,32:39],2,function(x) sum(is.na(x)))
+apply(training_set_dem[,1:31],2,function(x) sum(is.na(x)))
+apply(training_set_dem[,40:78],2,function(x) sum(is.na(x)))
+
+dem_rf_train_sj <- randomForest(summary_judgment ~ ., data = select(training_set_dem, -c(settled)), mtry = sqrt(68))
+dem_rf_train_settled <- randomForest(settled ~ ., data = select(training_set_dem,-c(summary_judgment)), mtry = sqrt(68))
+
+levels(test_set_dem$statute) <- levels(training_set_dem$statute)
+levels(test_set_dem$protected_class) <- levels(training_set_dem$protected_class)
+levels(test_set_dem$additional_nos) <- levels(training_set_dem$additional_nos)
+levels(test_set_dem$jury_demand) <- levels(training_set_dem$jury_demand)
+levels(test_set_dem$informa_pauperis) <- levels(training_set_dem$informa_pauperis)
+levels(test_set_dem$class_action) <- levels(training_set_dem$class_action)
+levels(test_set_dem$arbitration_at_filing) <- levels(training_set_dem$arbitration_at_filing)
+levels(test_set_dem$issue_joined) <- levels(training_set_dem$issue_joined)
+levels(test_set_dem$pretrial_conf) <- levels(training_set_dem$pretrial_conf)
+levels(test_set_dem$other_motion_type) <- levels(training_set_dem$other_motion_type)
+levels(test_set_dem$other_filing_party) <- levels(training_set_dem$other_filing_party)
+levels(test_set_dem$other_filed_before_joined) <- levels(training_set_dem$other_filed_before_joined)
+levels(test_set_dem$termination_motion_type) <- levels(training_set_dem$termination_motion_type)
+levels(test_set_dem$termination_filing_party) <- levels(termination_set_dem$termination_filing_party)
+levels(test_set_dem$termination_filed_before_joined) <- levels(training_set_dem$termination_filed_before_joined)
+levels(test_set_dem$county) <- levels(training_set_dem$county)
+levels(test_set_dem$state) <- levels(training_set_dem$state)
+levels(test_set_dem$district_name) <- levels(training_set_dem$district_name)
+
+full_preds_sj_test <- predict(dem_rf_train_sj, test_set_dem, type = "prob")
+full_preds_settled_test <- predict(dem_rf_train_settled, test_set_dem, type = "prob")
+submission_for_testing <- test_dockets %>% select(mudac_id) %>%
+  mutate(SummaryJudgment = full_preds_sj_test[,2], Settled = full_preds_settled_test[,2])
 submission_for_testing %>% arrange(desc(mudac_id))
 submission_table<- submission_for_testing %>% gather("outcome", "probability", -mudac_id) %>% arrange(desc(mudac_id)) %>% mutate(id = paste(mudac_id,outcome, sep = "-")) %>% select(id, probability)
 submission_table
@@ -322,13 +424,6 @@ write.csv(submission_table,"C:/Users/asus/Dropbox/MUDAC/MUDAC/Predictions/carlet
 
 
 
-
-```{r}
-preds_sj_test <- predict(rf_train_sj, test_set, type = "prob")
-submission_for_testing <- test_dockets %>% select(mudac_id) %>%
-  mutate(SummaryJudgment = preds_sj_test[,2], class_sj_val = ifelse(preds_sj_val[,2]>0.5,1,0))
-submission_for_testing_sj
-```
 
 
 
