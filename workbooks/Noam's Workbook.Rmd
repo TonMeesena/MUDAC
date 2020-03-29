@@ -21,7 +21,6 @@ library(randomForest)
 library(stargazer)
 library(readr)
 library(Hmisc)
-install.packages("neuralnet")
 library(neuralnet)
 ```
 
@@ -59,6 +58,7 @@ train_dockets_w_demog <- full_join(district_w_demog_2010_pop, demographics_2015,
 train_other <- full_join(select(train_dockets, c(1,33:36)), train_other_motions, by = "mudac_id")
 
 train_termination <- full_join(select(train_dockets, c(1,33:36)), train_termination_motions, by = "mudac_id")
+
 
 train_full <- full_join(train_dockets, train_other_motions, by = "mudac_id")
 train_full <- full_join(train_full, train_termination_motions, by = "mudac_id")
@@ -150,6 +150,28 @@ tree_summary_judgment <- rpart(summary_judgment ~ ., data = train_summary_judgme
 
 #plotting tree
 plot(as.party(tree_summary_judgment), type = "simple")
+preds_sj <- predict(tree_summary_judgment, train_summary_judgment, type = "prob")
+preds_sj[,1]
+train_summary_judgment <- train_summary_judgment %>%
+  mutate(prob_sj = preds_sj[,2])
+
+preds_settled <- predict(tree_settled, train_settled, type = "prob")
+train_settled <- train_settled %>%
+  mutate(prob_settled = preds_settled[,2])
+
+train_dockets %>% select(mudac_id) %>% mutate("summary judgment" = preds_sj[,2], settled = preds_settled[,2]) %>% gather("outcome", "probability", -mudac_id) %>% arrange(mudac_id) %>% mutate(Id = paste(mudac_id,outcome)) %>% select(Id, probability)
+
+train_dockets %>% select(mudac_id, outcome) %>% mutate("summary judgment" = preds_sj[,2], settled = preds_settled[,2]) %>% gather("outcome_type", "probability", -c(mudac_id, outcome)) %>% arrange(mudac_id) %>% mutate(Id = paste(mudac_id,outcome_type)) %>% select(Id, probability, outcome)
+```
+
+
+```{r}
+#Growing tree
+train_summary_judgment <- train_dockets %>% select(-c(outcome, settled, dismissed,mudac_id,primarytitle,nos_text))
+tree_summary_judgment <- rpart(summary_judgment ~ ., data = train_summary_judgment, method = "class")
+
+#plotting tree
+plot(as.party(tree_summary_judgment), type = "simple")
 preds_sj <- predict(tree_summary_judgment, type = "class")
 
 # Adding predictions to the data set
@@ -203,6 +225,10 @@ rf_summary_judgment_tree <- randomForest(summary_judgment ~ ., data = train_summ
 rf_summary_judgment_tree
 ```
 
+###Using full training dataset
+```{r}
+
+```
 
 
 
@@ -283,17 +309,117 @@ rf_settled_tree
 
 ###Neural Net
 ```{r}
-settled_nn <- neuralnet(settled~.,data=train_settled, hidden=31, act.fct = "logistic",
+settled_matrix <- model.matrix( 
+  ~ as + Pclass + Sex + Age + SibSp + Parch + Fare + Embarked, 
+  data = d 
+)
+
+settled_nn <- neuralnet(settled~.,data=train_settled, hidden=5, act.fct = "logistic",
                 linear.output = FALSE)
+plot(settled_nn)
+
+Predict <- compute(settled_nn,test)
+Predict$net.result
+
+prob <- Predict$net.result
+pred <- ifelse(prob>0.5, 1, 0)
+pred
+```
+
+###Running RF on test data
+```{r}
+test_dockets_cut <- test_dockets %>% select(-c(mudac_id,nos_text)) %>% mutate(summary_judgment = NA) %>% mutate(summary_judgment = as.factor(summary_judgment))
 ```
 
 
 
+```{r}
+rf_settled_tree_test <- randomForest(settled ~ ., data = train_settled, mtry = sqrt(30))
+rf_summary_judgment_tree_test
+
+train_summary_judgment
+
+test_dockets_cut <- test_dockets %>% select(-c(mudac_id,nos_text))
+preds_sj_test <- predict(rf_summary_judgment_tree, test_dockets_cut, type = "prob")
+preds_sj_test[,2]
+test_summary_judgment <- test_dockets %>% select(mudac_id) %>% mutate("summary judgment" = preds_sj_test[,2])
+
+preds_settled <- predict(tree_settled, train_settled, type = "prob")
+train_settled <- train_settled %>%
+  mutate(prob_settled = preds_settled[,2])
+
+train_dockets %>% select(mudac_id) %>% mutate("summary judgment" = preds_sj[,2], settled = preds_settled[,2]) %>% gather("outcome", "probability", -mudac_id) %>% arrange(mudac_id) %>% mutate(Id = paste(mudac_id,outcome)) %>% select(Id, probability)
+
+train_dockets %>% select(mudac_id, outcome) %>% mutate("summary judgment" = preds_sj[,2], settled = preds_settled[,2]) %>% gather("outcome_type", "probability", -c(mudac_id, outcome)) %>% arrange(mudac_id) %>% mutate(Id = paste(mudac_id,outcome_type)) %>% select(Id, probability, outcome)
+
+colnames(test_dockets)
+colnames(train_dockets)
+```
 
 
+##lets try this again
+##a) Model #1: Obtain a predicted probability that a case will be closed by a summary judgment
+```{r}
+#SJ
+train_summary_judgment <- train_dockets %>% select(-c(outcome, settled, dismissed,mudac_id,primarytitle,nos_text))
+test_summary_judgment <- test_dockets %>% select(-c(mudac_id, nos_text))
+
+levels(test_summary_judgment$statute) <- levels(train_summary_judgment$statute)
+levels(test_summary_judgment$protected_class) <- levels(train_summary_judgment$protected_class)
+levels(test_summary_judgment$additional_nos) <- levels(train_summary_judgment$additional_nos)
+levels(test_summary_judgment$jury_demand) <- levels(train_summary_judgment$jury_demand)
+levels(test_summary_judgment$informa_pauperis) <- levels(train_summary_judgment$informa_pauperis)
+levels(test_summary_judgment$class_action) <- levels(train_summary_judgment$class_action)
+levels(test_summary_judgment$arbitration_at_filing) <- levels(train_summary_judgment$arbitration_at_filing)
+levels(test_summary_judgment$issue_joined) <- levels(train_summary_judgment$issue_joined)
+levels(test_summary_judgment$pretrial_conf) <- levels(train_summary_judgment$pretrial_conf)
+
+rf_summary_judgment_tree <- randomForest(summary_judgment ~ ., data = train_summary_judgment, mtry = sqrt(30))
+rf_summary_judgment_tree
+
+preds_sj <- predict(rf_summary_judgment_tree, train_summary_judgment, type = "prob")
+submission_for_training <- train_dockets %>% select(mudac_id) %>%
+  mutate(prob_sj = preds_sj[,2])
+submission_for_training
+
+preds_sj_test <- predict(rf_summary_judgment_tree, test_summary_judgment, type = "prob")
+submission_for_testing <- test_dockets %>% select(mudac_id) %>%
+  mutate(prob_sj_test = preds_sj_test[,2])
+submission_for_testing
 
 
+#Settled
+train_settled <- train_dockets %>% select(-c(outcome, summary_judgment, dismissed,mudac_id,primarytitle,nos_text))
+test_settled <- test_dockets %>% select(-c(mudac_id, nos_text))
+
+levels(test_settled$statute) <- levels(train_settled$statute)
+levels(test_settled$protected_class) <- levels(train_settled$protected_class)
+levels(test_settled$additional_nos) <- levels(train_settled$additional_nos)
+levels(test_settled$jury_demand) <- levels(train_settled$jury_demand)
+levels(test_settled$informa_pauperis) <- levels(train_settled$informa_pauperis)
+levels(test_settled$class_action) <- levels(train_settled$class_action)
+levels(test_settled$arbitration_at_filing) <- levels(train_settled$arbitration_at_filing)
+levels(test_settled$issue_joined) <- levels(train_settled$issue_joined)
+levels(test_settled$pretrial_conf) <- levels(train_settled$pretrial_conf)
+
+rf_settled_tree <- randomForest(settled ~ ., data = train_settled, mtry = sqrt(30))
+rf_settled_tree
+
+preds_settled <- predict(rf_settled_tree, train_settled, type = "prob")
+submission_for_training <- submission_for_training %>%
+  mutate(prob_settled = preds_settled[,2])
+colnames(submission_for_training) <- c("mudac_id", "SummaryJudgment", "Settled")
+submission_for_training %>% gather("outcome", "Probability", -mudac_id) %>% arrange(mudac_id) %>% mutate(id = paste(mudac_id,outcome, sep = "-")) %>% select(id, Probability) %>% arrange(desc(id))
+
+preds_settled_test <- predict(rf_settled_tree, test_settled, type = "prob")
+submission_for_testing <- submission_for_testing %>%
+  mutate(prob_settled_test = preds_settled_test[,2])
+submission_for_testing
+
+colnames(submission_for_testing) <- c("mudac_id", "SummaryJudgment", "Settled")
+submission_for_testing  %>% gather("outcome", "Probability", -mudac_id) %>% arrange(mudac_id) %>% mutate(id = paste(mudac_id,outcome, sep = "-")) %>% select(id, Probability) %>% arrange(desc(id))
+```
 
 
-
+##b) Model #2: Obtain a predicted probability that a case will be closed by a settlement
 
