@@ -16,7 +16,7 @@ library(corrplot)
 library(tidyverse)
 library(stargazer)
 library(car)
-install.packages("leaps")
+library(effects)
 library(leaps)
 ```
 
@@ -193,9 +193,23 @@ binomial_smooth <- function(...){
   geom_smooth(method = "glm", method.args = list(family = "binomial"), se=FALSE)
 }
 
-ggplot(df.freq_full_FIPS_for_plotting, aes(x=output, y=highOrLow, color  = Freq)) + geom_point() + 
+ggplot(df.freq_full_FIPS_for_plotting, aes(x=output, y=highOrLow, color  = log(Freq))) + geom_point() + 
   facet_wrap(~ variable) + 
   binomial_smooth()
+
+fit_stepwise_both
+fit_stepwise_both[[c(1,15)]]
+for(i in 15:28){
+  beta0 <- fit_stepwise_both[[c(1,1)]]
+  beta1 <- fit_stepwise_both[[c(1,i)]]
+  e <- exp(1)
+  curve((e^(beta0+beta1*x))/(1+e^(beta0+beta1*x)), from = 0, to=1, n=1000, xlab="xvalue", ylab="yvalue")
+}
+
+
+tableData <- as.data.frame(fit_stepwise_both)
+
+
 ```
 
 
