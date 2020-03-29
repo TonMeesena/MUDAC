@@ -21,6 +21,7 @@ library(dplyr)
 library(corrplot)
 library(randomForest)
 library(reshape2)
+library(forcats)
 
 
 #Merge
@@ -330,13 +331,58 @@ train_mo_sm%>%
 
 
 ggplot(train_mo_sm,aes(x=circuit,y=ratio,fill=circuit))+
-  geom_bar(stat="summary",fun.y="mean")
+  geom_bar(stat="summary",fun.y="mean")+ 
+  theme(
+    plot.background = element_rect(fill = "gray93"),
+    panel.background = element_rect(fill = "white"),
+    plot.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(linetype = 3, color = "gray50"),
+    axis.line.x = element_line(),
+    axis.line.y = element_line(),
+    strip.background = element_rect(fill = "gray75"),
+    plot.caption = element_text(hjust = 0),
+    axis.ticks = element_blank()
+  ) + labs(x = "Circuit", 
+    y = "Proportion (Motions for Summary Judgment Granted/Total Motions for Summary Judgment)")
 
-ggplot(train_mo_sm,aes(x=district,y=ratio,fill=circuit))+
-  geom_bar(stat = 'identity')
 
-ggplot(train_mo_sm,aes(x=reorder(district,ratio),y=ratio,fill=circuit))+
-  geom_bar(stat = 'identity')
+ggplot(train_mo_sm,aes(x=district,y=ratio,fill=countAll))+
+  geom_bar(stat = 'identity')+ 
+  theme(
+    plot.background = element_rect(fill = "gray93"),
+    panel.background = element_rect(fill = "white"),
+    plot.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(linetype = 3, color = "gray50"),
+    axis.line.x = element_line(),
+    axis.line.y = element_line(),
+    strip.background = element_rect(fill = "gray75"),
+    plot.caption = element_text(hjust = 0),
+    axis.ticks = element_blank()
+  ) + labs(x = "District", 
+           y = "Proportion (Motions for Summary Judgment Granted/Total Motions for Summary Judgment)",
+           fill="Total Motions for Summary Judgment")
+
+ggplot(train_mo_sm,aes(x=reorder(district,ratio),y=ratio,,fill=countAll))+
+  geom_bar(stat = 'identity')+ 
+  theme(
+    plot.background = element_rect(fill = "gray93"),
+    panel.background = element_rect(fill = "white"),
+    plot.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(linetype = 3, color = "gray50"),
+    axis.line.x = element_line(),
+    axis.line.y = element_line(),
+    strip.background = element_rect(fill = "gray75"),
+    plot.caption = element_text(hjust = 0),
+    axis.ticks = element_blank()
+  ) + labs(x = "District", 
+           y = "Proportion (Motions for Summary Judgment Granted/Total Motions for Summary Judgment)",
+           fill="Total Motions for Summary Judgment")
 
 
 df7 <- data.frame(train_mo_sm$district, train_mo_sm$countSM, train_mo_sm$countAll)
@@ -345,10 +391,18 @@ df8 <- reshape2::melt(df7, id.vars='district')
 head(df8)
 
 ggplot(df8, aes(x=district, y=value, fill=variable)) +
-  geom_bar(stat='identity', position='dodge')
+  geom_bar(stat='identity', position='dodge')+
+   scale_fill_discrete( labels = c("Motion for Summary J Granted", "Total Motion for Summary J"))+
+ labs(x = "District", 
+       y = "Motions for Summary Judgment",
+       fill="Granted/Total")
 
 ggplot(df8, aes(x=reorder(district,value), y=value, fill=variable)) +
-  geom_bar(stat='identity', position='dodge')
+  geom_bar(stat='identity', position='dodge')+
+  scale_fill_discrete( labels = c("Motion for Summary J Granted", "Total Motion for Summary J"))+
+ labs(x = "District", 
+       y = "Motions for Summary Judgment",
+       fill="Granted/Total")
 
 
 #Motion to dismiss
@@ -363,7 +417,7 @@ train$MoSumDis<-0
 train$MoSumDis[which(as.character(train$motion_type.tm)=="Motion to Dismiss"&
                        as.character(train$outcome)=="Dismissed")]<-1
 
-ggplot(train[which(train$MoSumDis==1),],aes(x=district,fill=district))+
+ggplot(train[which(train$MoSumDis==1),],aes(x=district))+
   geom_bar()
 
 
@@ -393,13 +447,59 @@ train_mo_sd%>%
 
 
 ggplot(train_mo_sd,aes(x=circuit,y=ratio,fill=circuit))+
-  geom_bar(stat="summary",fun.y="mean")
+  geom_bar(stat="summary",fun.y="mean")+ 
+  theme(
+    plot.background = element_rect(fill = "gray93"),
+    panel.background = element_rect(fill = "white"),
+    plot.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(linetype = 3, color = "gray50"),
+    axis.line.x = element_line(),
+    axis.line.y = element_line(),
+    strip.background = element_rect(fill = "gray75"),
+    plot.caption = element_text(hjust = 0),
+    axis.ticks = element_blank()
+  ) + labs(x = "Circuit", 
+           y = "Proportion (Motions to dismiss Granted/Total Motions to dismiss)")
 
-ggplot(train_mo_sd,aes(x=district,y=ratio,fill=circuit))+
-  geom_bar(stat = 'identity')
 
-ggplot(train_mo_sd,aes(x=reorder(district,ratio),y=ratio,fill=circuit))+
-  geom_bar(stat = 'identity')
+ggplot(train_mo_sd,aes(x=district,y=ratio,fill=countAll))+
+  geom_bar(stat = 'identity')+ 
+  theme(
+    plot.background = element_rect(fill = "gray93"),
+    panel.background = element_rect(fill = "white"),
+    plot.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(linetype = 3, color = "gray50"),
+    axis.line.x = element_line(),
+    axis.line.y = element_line(),
+    strip.background = element_rect(fill = "gray75"),
+    plot.caption = element_text(hjust = 0),
+    axis.ticks = element_blank()
+  ) + labs(x = "District", 
+           y = "Proportion (Motions to Dismiss Granted/Total Motion to Dismiss)",
+           fill="Total Motion to Dismiss"
+          )
+
+ggplot(train_mo_sd,aes(x=reorder(district,ratio),y=ratio,fill=countAll))+
+  geom_bar(stat = 'identity')+ 
+  theme(
+    plot.background = element_rect(fill = "gray93"),
+    panel.background = element_rect(fill = "white"),
+    plot.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(linetype = 3, color = "gray50"),
+    axis.line.x = element_line(),
+    axis.line.y = element_line(),
+    strip.background = element_rect(fill = "gray75"),
+    plot.caption = element_text(hjust = 0),
+    axis.ticks = element_blank()
+  ) + labs(x = "District", 
+           y = "Proportion (Motions to Dismiss Granted/Total Motion to Dismiss)",
+           fill="Total Motion to Dismiss")
 
 
 df9 <- data.frame(train_mo_sd$district, train_mo_sd$countSM, train_mo_sd$countAll)
@@ -408,10 +508,18 @@ df10 <- reshape2::melt(df9, id.vars='district')
 head(df10)
 
 ggplot(df10, aes(x=district, y=value, fill=variable)) +
-  geom_bar(stat='identity', position='dodge')
+  geom_bar(stat='identity', position='dodge')+
+  scale_fill_discrete( labels = c("Motion to Dismiss Granted", "Total Motion to Dismiss"))+
+  labs(x = "District", 
+       y = "Motions to Dismiss",
+       fill="Granted/Total")
 
 ggplot(df10, aes(x=reorder(district,value), y=value, fill=variable)) +
-  geom_bar(stat='identity', position='dodge')
+  geom_bar(stat='identity', position='dodge')+
+  scale_fill_discrete( labels = c("Motion to Dismiss Granted", "Total Motion to Dismiss"))+
+  labs(x = "District", 
+       y = "Motions to Dismiss",
+       fill="Granted/Total")
 
 
 
@@ -465,7 +573,7 @@ ggplot(train,aes(x=decision,fill=filed_before_joined.tm))+geom_bar()+facet_wrap(
 
 
 
-ggplot(train,aes(motion_type.tm,fill=summary_judgment))+geom_bar()+facet_wrap(~outcome)+
+ggplot(train,aes(outcome,fill=summary_judgment))+geom_bar()+facet_wrap(~motion_type.tm)+
   theme(axis.text.x=element_text(angle=45,hjust=1))
 
 FscoreDT1<-train%>%
@@ -480,6 +588,124 @@ FscoreDT2<-train%>%
                                        as.character(outcome)=="Dismissed")))%>%
   group_by(district)%>%
   summarise(countGetDef=n())
+
+trainF<-train[which(as.character(train$filing_party.tm)%in%c("Defendant","Plaintiff")|
+        as.character(train$filing_party.om)%in%c("Defendant","Plaintiff") ),
+          c("mudac_id","district","filing_party.tm","motion_type.tm","summary_judgment",
+          "outcome","filing_party.om","motion_type.om","district","decision")]
+
+trainF<-train
+
+
+trainF<-mutate(trainF,countgettm=ifelse(((summary_judgment==1&
+                                            as.character(motion_type.tm)=="Motion for Summary Judgment")|
+                                           ((as.character(motion_type.tm)=="Motion to Dismiss")&
+                                              as.character(outcome)=="Dismissed")),1,0))
+
+trainF%>%
+  filter(countgettm==1)%>%
+  group_by(district)%>%
+  summarise(count=n())
+
+
+trainF<-mutate(trainF,countgetomG=ifelse((as.character(decision)=="Granted"),1,0))
+trainF<-mutate(trainF,countgetomD=ifelse((as.character(decision)=="Denied"),1,0))
+
+
+ggplot(trainF,aes(outcome,fill=as.factor(countgetomG)))+geom_bar()+facet_wrap(~motion_type.om)+
+  theme(axis.text.x=element_text(angle=45,hjust=1))
+
+trainF1<-trainF%>%
+  filter(countgettm==1)%>%
+  group_by(district,filing_party.tm)%>%
+  summarise(counttm=n())
+
+trainF1<-trainF1[as.character(trainF1$filing_party.tm)%in%c("Defendant","Plaintiff"),] %>%
+  spread(key = 'filing_party.tm', value = 'counttm')
+
+
+names(trainF1)<-c("district","Def_counttm","Pla_counttm")
+
+trainF2<-trainF%>%
+  filter(countgetomG==1)%>%
+  group_by(district,filing_party.om)%>%
+  summarise(countomG=n())
+
+trainF2<-trainF2[as.character(trainF2$filing_party.om)%in%c("Defendant","Plaintiff"),]%>%
+  spread(key = 'filing_party.om', value = 'countomG')
+
+names(trainF2)<-c("district","Def_countomG","Pla_countomG")
+
+trainF3<-trainF%>%
+  filter(countgetomD==1)%>%
+  group_by(district,filing_party.om)%>%
+  summarise(countomD=n())
+
+trainF3<-trainF3[as.character(trainF3$filing_party.om)%in%c("Defendant","Plaintiff"),]%>%
+  spread(key = 'filing_party.om', value = 'countomD')
+
+names(trainF3)<-c("district","Def_countomD","Pla_countomD")
+
+train_def_plain <-full_join(trainF1, trainF2, by = c('district' = 'district'))
+train_def_plain <-full_join(train_def_plain, trainF3, by = c('district' = 'district'))
+train_def_plain<-train_def_plain[-27,]
+
+train_def_plain<-mutate(train_def_plain,countAll=
+                 Def_counttm +Pla_counttm+ Def_countomG +Pla_countomG +Def_countomD +Pla_countomD)
+
+train_def_plain<-mutate(train_def_plain,countAllDef=
+                          Def_counttm+Def_countomG+Pla_countomD)
+
+train_def_plain<-mutate(train_def_plain,countAllPlain=
+                          Pla_counttm+Pla_countomG+Def_countomD)
+
+train_def_plain<-mutate(train_def_plain,Def_ratio=
+                          countAllDef/countAll)
+train_def_plain<-mutate(train_def_plain,Plain_ratio=
+                          countAllPlain/countAll)
+
+ggplot(train_def_plain,aes(x=district,y=Plain_ratio))+geom_bar(stat='identity',fill="blue")
+ggplot(train_def_plain,aes(x=reorder(district,Plain_ratio),y=Plain_ratio))+
+  geom_bar(stat='identity',fill="blue")
+ggplot(train_def_plain,aes(x=reorder(district,Def_ratio),y=Def_ratio))+
+  geom_bar(stat='identity',fill="pink")
+
+dq1 <- data.frame(train_def_plain$district, train_def_plain$countAllDef, train_def_plain$countAllPlain)
+names(dq1)<-c("district","Defendant","Plaintiff")
+dq2 <- reshape2::melt(dq1, id.vars='district')
+head(dq2)
+
+ggplot(dq2, aes(x=reorder(district,value), y=value, fill=variable)) +
+  geom_bar(stat='identity', position='dodge')
+
+ggplot(dq2, aes(x=reorder(district,value), y=value, fill=variable)) +
+  geom_bar(stat='identity', position='dodge')
+
+colnames(train_def_plain)[11:12] <- c("Defendant", "Plaintiff")
+  
+train_def_plain_for_ratio_graph <- train_def_plain %>% ungroup() %>% gather("filer", "ratio", c(Defendant, Plaintiff)) %>%
+  mutate(filer = as.factor(filer), district = as.factor(district))
+
+train_def_plain_for_ratio_graph %>%
+  ggplot(aes(fct_reorder(district, desc(ratio)), ratio, fill = filer)) +
+  geom_bar(stat = 'identity', position = 'dodge') +
+  theme(
+    plot.background = element_rect(fill = "gray93"),
+    panel.background = element_rect(fill = "white"),
+    plot.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(linetype = 3, color = "gray50"),
+    axis.line.x = element_line(),
+    axis.line.y = element_line(),
+    strip.background = element_rect(fill = "gray75"),
+    plot.caption = element_text(hjust = 0),
+    axis.ticks = element_blank()
+  ) + labs(x = "District", y = "Proportion (Motions Granted to Filing Party/Total Motions Granted)")
+
+
+
+
 
 
 

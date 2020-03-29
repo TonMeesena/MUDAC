@@ -13,6 +13,11 @@ library(MASS)
 library(gridExtra)
 library(forcats)
 library(corrplot)
+library(tidyverse)
+library(stargazer)
+library(car)
+install.packages("leaps")
+library(leaps)
 ```
 
 #loading data
@@ -163,6 +168,38 @@ grid.arrange(pd1, pd2, pd3, nrow = 1)
 
 #Logistic Regression
 ```{r}
-fit <- glm(highOrLow~Men+Women+Hispanic+White+Black+Native+Asian,data=df.freq_full_FIPS,family="binomial")
+fit <- glm(highOrLow~Men+Women+Hispanic+White+Black+Native+Asian, data=df.freq_full_FIPS,family="binomial")
 summary(fit)
+
+
+fit_full <- glm(highOrLow ~., data = dplyr::select(df.freq_full_FIPS, -c(filers_county, County, Freq)), family = "binomial")
+summary(fit_full)
+
+fit_simple <- glm(highOrLow ~-., data = dplyr::select(df.freq_full_FIPS, -c(filers_county, County, Freq)), family = "binomial")
+
+fit_stepwise_both <- stepAIC(fit_full, direction = "both", 
+                      trace = FALSE)
+
+stargazer(fit_stepwise_both, type = "text")
+
+summary(fit_stepwise_both)
+
+car::vif(fit_stepwise_both)
+
+df.freq_full_FIPS_for_plotting <- df.freq_full_FIPS %>% dplyr::select(c(State, TotalPop, Hispanic, White, Native, Asian, Citizen, IncomePerCap, Poverty, Construction, Carpool,Employed,PrivateWork,SelfEmployed,Unemployment,highOrLow,Freq)) %>%
+  gather("variable", "output", -c(highOrLow, Freq))
+
+binomial_smooth <- function(...){
+  geom_smooth(method = "glm", method.args = list(family = "binomial"), se=FALSE)
+}
+
+ggplot(df.freq_full_FIPS_for_plotting, aes(x=output, y=highOrLow, color  = Freq)) + geom_point() + 
+  facet_wrap(~ variable) + 
+  binomial_smooth()
 ```
+
+
+
+
+
+
