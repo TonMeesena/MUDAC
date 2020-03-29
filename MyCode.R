@@ -561,6 +561,12 @@ ggplot(train,aes(x=outcome,fill=decision))+
 ggplot(train,aes(x=decision,fill=filed_before_joined.tm))+geom_bar()+facet_wrap(~outcome)+
   theme(axis.text.x=element_text(angle=45,hjust=1))
 
+ggplot(train,aes(x=decision))+geom_bar(fill="chocolate2")+facet_wrap(~outcome)+
+  theme(axis.text.x=element_text(angle=45,hjust=1))+
+    labs(x = "Decision", 
+           y = "Number of Decisions",
+           title="Outcome Vs Decision")
+
 
 #Naive method for checking the favor
 
@@ -664,21 +670,81 @@ train_def_plain<-mutate(train_def_plain,Def_ratio=
 train_def_plain<-mutate(train_def_plain,Plain_ratio=
                           countAllPlain/countAll)
 
-ggplot(train_def_plain,aes(x=district,y=Plain_ratio))+geom_bar(stat='identity',fill="blue")
-ggplot(train_def_plain,aes(x=reorder(district,Plain_ratio),y=Plain_ratio))+
-  geom_bar(stat='identity',fill="blue")
-ggplot(train_def_plain,aes(x=reorder(district,Def_ratio),y=Def_ratio))+
-  geom_bar(stat='identity',fill="pink")
+ggplot(train_def_plain,aes(x=district,y=Plain_ratio,fill=countAll))+geom_bar(stat='identity')+ 
+  theme(
+    plot.background = element_rect(fill = "gray93"),
+    panel.background = element_rect(fill = "white"),
+    plot.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(linetype = 3, color = "gray50"),
+    axis.line.x = element_line(),
+    axis.line.y = element_line(),
+    strip.background = element_rect(fill = "gray75"),
+    plot.caption = element_text(hjust = 0),
+    axis.ticks = element_blank()
+  ) + labs(x = "District", 
+           y = "Proportion (Plaintiff's Motions Granted/Total Motion Granted)",
+           fill="Total Motion Granted"
+  )
+
+
+ggplot(train_def_plain,aes(x=reorder(district,Plain_ratio),y=Plain_ratio,fill=countAll))+
+  geom_bar(stat='identity')+ 
+  theme(
+    plot.background = element_rect(fill = "gray93"),
+    panel.background = element_rect(fill = "white"),
+    plot.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(linetype = 3, color = "gray50"),
+    axis.line.x = element_line(),
+    axis.line.y = element_line(),
+    strip.background = element_rect(fill = "gray75"),
+    plot.caption = element_text(hjust = 0),
+    axis.ticks = element_blank()
+  ) + labs(x = "District", 
+           y = "Proportion (Plaintiff's Motions Granted/Total Motion Granted)",
+           fill="Total Motion Granted"
+  )
+
+
+ggplot(train_def_plain,aes(x=reorder(district,Def_ratio),y=Def_ratio,fill=countAll))+
+  geom_bar(stat='identity')+ 
+  theme(
+    plot.background = element_rect(fill = "gray93"),
+    panel.background = element_rect(fill = "white"),
+    plot.title = element_text(face = "bold"),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_blank(),
+    panel.grid.major.y = element_line(linetype = 3, color = "gray50"),
+    axis.line.x = element_line(),
+    axis.line.y = element_line(),
+    strip.background = element_rect(fill = "gray75"),
+    plot.caption = element_text(hjust = 0),
+    axis.ticks = element_blank()
+  ) + labs(x = "District", 
+           y = "Proportion (Defendant's Motions Granted/Total Motion Granted)",
+           fill="Total Motion Granted"
+  )
+
+
 
 dq1 <- data.frame(train_def_plain$district, train_def_plain$countAllDef, train_def_plain$countAllPlain)
 names(dq1)<-c("district","Defendant","Plaintiff")
 dq2 <- reshape2::melt(dq1, id.vars='district')
 head(dq2)
 
-ggplot(dq2, aes(x=reorder(district,value), y=value, fill=variable)) +
-  geom_bar(stat='identity', position='dodge')
+ggplot(dq2, aes(x=district, y=value, fill=variable)) +
+  geom_bar(stat='identity', position='dodge')+
+ labs(x = "District", 
+       y = " Motions Granted",
+       fill="Granted for Defendant/Plaintiff "
+)
 
-ggplot(dq2, aes(x=reorder(district,value), y=value, fill=variable)) +
+
+
+22ggplot(dq2, aes(x=reorder(district,value), y=value, fill=variable)) +
   geom_bar(stat='identity', position='dodge')
 
 colnames(train_def_plain)[11:12] <- c("Defendant", "Plaintiff")
@@ -687,7 +753,7 @@ train_def_plain_for_ratio_graph <- train_def_plain %>% ungroup() %>% gather("fil
   mutate(filer = as.factor(filer), district = as.factor(district))
 
 train_def_plain_for_ratio_graph %>%
-  ggplot(aes(fct_reorder(district, desc(ratio)), ratio, fill = filer)) +
+  ggplot(aes(fct_reorder(district, ratio), ratio, fill = filer)) +
   geom_bar(stat = 'identity', position = 'dodge') +
   theme(
     plot.background = element_rect(fill = "gray93"),
