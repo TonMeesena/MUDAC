@@ -107,9 +107,12 @@ for (i in 1:dim(df.freq_tmp)[1]){
 
 #getting rid of repetitions
 df.freq_full_FIPS <- df.freq_full_FIPS %>% distinct(filers_county, .keep_all = TRUE)
+#getting rid of rows with NA
+#df.freq_full_FIPS <- df.freq_full_FIPS[complete.cases(df.freq_full_FIPS), ]
 
 #joining data with demographic
 acs2015_county <- acs2015_county %>% mutate(CensusId = as.factor(CensusId))
+
 df.freq_full_FIPS <-left_join(df.freq_full_FIPS, acs2015_county, by=c("filers_county" = "CensusId"))
 
 #Adding data
@@ -130,5 +133,12 @@ pd3 <- ggplot(df.freq_full_FIPS, aes(x = Poverty, y = highOrLow)) +
   geom_bar(stat = "identity") + 
   ggtitle("Demo1") + xlab("Poverty") + ylab("high or low")
 pd3
+
+#Logistic Regression
+Gender <- Men + Women
+Race <- Hispanic+White+Black+Native+Asian
+fit <- glm(highOrLow~Men+Women+Hispanic+White+Black+Native+Asian,data=df.freq_full_FIPS,family="binomial")
+summary(fit)
+
 
 
