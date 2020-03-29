@@ -10,6 +10,7 @@ library(dplyr)
 library(MASS)   
 library(gridExtra)
 
+
 #loading data
 train_dockets <- read.csv("raw_data/train_dockets.csv",header=TRUE)
 train_other <- read.csv("raw_data/train_other_motions.csv",header=TRUE)
@@ -19,6 +20,9 @@ test_other <- read.csv("raw_data/test_other_motions.csv",header=TRUE)
 test_terminating <- read.csv("raw_data/test_terminating_motions.csv",header=TRUE)
 districts <- read.csv("raw_data/districts.csv",header=TRUE)
 district_fips_code <- read.csv("raw_data/district_fips_code.csv",header=TRUE)
+acs2015_tract <- read.csv("raw_data/us-census-demographic-data/acs2015_census_tract_data.csv",header=TRUE)
+acs2015_county <- read.csv("raw_data/us-census-demographic-data/acs2015_county_data.csv",header=TRUE) 
+
 
 #preparing the district data
 dockets_district <- train_dockets$district
@@ -59,7 +63,7 @@ for(i in 1:dim(df.dockets_district)[1]){
   }
 }
 
-df.dockets_FIPS_HIGH %>% filter(train_dockets, highOrLow == 1)
+df.dockets_FIPS_HIGH <- filter(train_dockets, highOrLow == 1)
 df.dockets_FIPS_LOW <- filter(train_dockets, highOrLow == 0)
 df.dockets_FIPS_HIGH <- select_(df.dockets_FIPS_HIGH, "district", "filers_county")
 df.dockets_FIPS_LOW <- select_(df.dockets_FIPS_LOW, "district", "filers_county")
@@ -72,6 +76,7 @@ df.high_FIPS <- as.data.frame(high.frequency)
 low.frequency <- table(df.dockets_FIPS_LOW$filers_county)
 df.low_FIPS <- as.data.frame(low.frequency)
 
+
 #plotting
 p3 <- ggplot(df.high_FIPS, aes(x = Var1, y = Freq)) +
   geom_bar(stat = "identity") + ggtitle("High Filing FIPS' Frequencies") +
@@ -82,3 +87,16 @@ p4 <- ggplot(df.low_FIPS, aes(x = Var1, y = Freq)) +
 
 grid.arrange(p3, p4, nrow = 1)
 
+#modify for demographic
+
+df.full_FIPS <- arrange(df.dockets_district, desc(ratioTo100000))
+df.Ordered_dockets <- data.frame(matrix(ncol = length(train_dockets), nrow = 0))
+df.Ordered_dockets <- subset(train_dockets, FALSE)
+
+for(i in 1:dim(df.full_FIPS)[1]){
+  for(j in 1:dim(train_dockets)[1]){
+    if (train_dockets$district[j] == df.full_FIPS$dockets_district[i]){
+      df.Ordered_dockets %>% rbind(train_dockets[j,])
+    }
+  }
+}
