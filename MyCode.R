@@ -458,4 +458,29 @@ ggplot(train,aes(x=decision,fill=filed_before_joined.tm))+geom_bar()+facet_wrap(
 
 
 
+#trainF<-train[which(as.character(train$filing_party.tm)%in%c("Defendant","Plaintiff")|
+                      #as.character(train$filing_party.om)%in%c("Defendant","Plaintiff") ),
+              #c("mudac_id","district","filing_party.tm","motion_type.tm","summary_judgment",
+                # "outcome","filing_party.om","motion_type.om","district")]
+
+
+
+ggplot(train,aes(motion_type.tm,fill=summary_judgment))+geom_bar()+facet_wrap(~outcome)+
+  theme(axis.text.x=element_text(angle=45,hjust=1))
+
+FscoreDT1<-train%>%
+  filter(as.character(filing_party.tm)=="Defendant")%>%
+  group_by(district)%>%
+  summarise(countAllDef=n())
+
+FscoreDT2<-train%>%
+  filter(as.character(filing_party.tm)=="Defendant"&
+           ((as.character(motion_type.tm)=="Motion for Summary Judgment"&
+               summary_judgment==1)|(as.character(motion_type.tm)=="Motion to Dismiss"&
+                                       as.character(outcome)=="Dismissed")))%>%
+  group_by(district)%>%
+  summarise(countGetDef=n())
+
+
+
 
