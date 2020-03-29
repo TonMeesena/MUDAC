@@ -4,16 +4,6 @@ author: "Noam Benkler"
 date: "March 28, 2020"
 output: html_document
 ---
-```{r}
-data$favor <- mutate(data$favor, 
-                     if("filing party" =="Plaintiff" && decision == "Granted"|
-                        "filing party" =="Defendant" && decision == "Denied"){"Plaintiff"
-                       }else if("filing party"=="Defendant" && decision == "Granted"|
-                                "filing party"=="Plaintiff" && decision == "Denied"){"Defendant"
-                         }else{NA})
-```
-
-
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
