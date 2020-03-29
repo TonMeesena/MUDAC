@@ -186,7 +186,7 @@ summary(fit_stepwise_both)
 
 car::vif(fit_stepwise_both)
 
-df.freq_full_FIPS_for_plotting <- df.freq_full_FIPS %>% dplyr::select(c(State, TotalPop, Hispanic, White, Native, Asian, Citizen, IncomePerCap, Poverty, Construction, Carpool,Employed,PrivateWork,SelfEmployed,Unemployment,highOrLow,Freq)) %>%
+df.freq_full_FIPS_for_plotting <- df.freq_full_FIPS %>% dplyr::select(c(State, TotalPop, Hispanic, White, Native, Asian, Citizen, IncomePerCap, Poverty, Construction, Carpool,Employed,PrivateWork,SelfEmployed,Unemployment,highOrLow,Freq,MaleFemaleRatio)) %>%
   gather("variable", "output", -c(highOrLow, Freq))
 
 binomial_smooth <- function(...){
@@ -207,7 +207,7 @@ for(i in 15:28){
 }
 
 
-tableData <- as.data.frame(fit_stepwise_both)
+
 
 
 ```
