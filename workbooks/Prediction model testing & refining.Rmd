@@ -38,6 +38,7 @@ district_fips_code <- read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/distr
 
 #Wrangling
 ```{r}
+#training set
 train_dockets <- train_dockets %>%
   mutate(summary_judgment = as.factor(summary_judgment), settled = as.factor(settled))
 
@@ -52,12 +53,20 @@ colnames(train_full)[36:45] <- c("other_motion_type", "other_filing_party", "oth
                                  "other_decision", "other_decided_before_joined", "other_proceeding_percentile",
                                  "termination_motion_type", "termination_filing_party",
                                  "termination_filed_before_joined", "termination_proceeding_percentile")
+
+#test set
+test_full <- left_join(test_dockets, test_other_motions, by = "mudac_id")
+test_full <- left_join(test_full, test_termination_motions, by = "mudac_id")
+colnames(test_full)[32:41] <- c("other_motion_type", "other_filing_party", "other_filed_before_joined",
+                                 "other_decision", "other_decided_before_joined", "other_proceeding_percentile",
+                                 "termination_motion_type", "termination_filing_party",
+                                 "termination_filed_before_joined", "termination_proceeding_percentile")
 ```
 
 #Creating Validation and Training
 ```{r}
 colnames(train_full)
-train_set <- train_dockets %>% sample_frac(0.5) %>% select(-c(outcome, mudac_id, primarytitle, nos_text))
+train_set <- train_dockets %>% sample_frac(0.75) %>% select(-c(outcome, mudac_id, primarytitle, nos_text))
 val_set <- train_dockets %>% select(-c(outcome, mudac_id, primarytitle, nos_text)) %>% setdiff(train_set)
 ```
 
@@ -215,7 +224,7 @@ plot(settled_nn)
 sj_nn_backprop <- neuralnet(sj_col_list, data=model_matrix,
                             algorithm = "backprop",
                             hidden=c(10,3),
-                            learningrate = 0.0001)
+                            learningrate = 0.0000001)
 
 
 #validation
@@ -249,9 +258,76 @@ pred
 ```
 
 
-#Generating Actual predictions
-```{r}
 
+#Generating Actual predictions
+##only dockets
+```{r}
+training_set <- train_dockets %>% select(-c(outcome, mudac_id, primarytitle, nos_text))
+test_set <- test_dockets %>% select(-c(mudac_id, nos_text))
+
+rf_train_sj <- randomForest(summary_judgment ~ ., data = select(training_set, -c(settled)), mtry = sqrt(29))
+rf_train_settled <- randomForest(settled ~ ., data = select(training_set,-c(summary_judgment)), mtry = sqrt(29))
+
+levels(test_set$statute) <- levels(training_set$statute)
+levels(test_set$protected_class) <- levels(training_set$protected_class)
+levels(test_set$additional_nos) <- levels(training_set$additional_nos)
+levels(test_set$jury_demand) <- levels(training_set$jury_demand)
+levels(test_set$informa_pauperis) <- levels(training_set$informa_pauperis)
+levels(test_set$class_action) <- levels(training_set$class_action)
+levels(test_set$arbitration_at_filing) <- levels(training_set$arbitration_at_filing)
+levels(test_set$issue_joined) <- levels(training_set$issue_joined)
+levels(test_set$pretrial_conf) <- levels(training_set$pretrial_conf)
+
+preds_sj_test <- predict(rf_train_sj, test_set, type = "prob")
+preds_settled_test <- predict(rf_train_settled, test_set, type = "prob")
+submission_for_testing <- test_dockets %>% select(mudac_id) %>%
+  mutate(SummaryJudgment = preds_sj_test[,2], Settled = preds_settled_test[,2])
+submission_for_testing %>% arrange(desc(mudac_id))
+submission_table<- submission_for_testing %>% gather("outcome", "probability", -mudac_id) %>% arrange(desc(mudac_id)) %>% mutate(id = paste(mudac_id,outcome, sep = "-")) %>% select(id, probability)
+submission_table
+
+write.csv(submission_table,"C:/Users/asus/Dropbox/MUDAC/MUDAC/Predictions/carleton.edu_Team_01.csv", row.names = FALSE)
+```
+
+
+##full training/testing sets
+```{r}
+training_set <- train_dockets %>% select(-c(outcome, mudac_id, primarytitle, nos_text))
+test_set <- test_dockets %>% select(-c(mudac_id, nos_text))
+
+rf_train_sj <- randomForest(summary_judgment ~ ., data = select(training_set, -c(settled)), mtry = sqrt(29))
+rf_train_settled <- randomForest(settled ~ ., data = select(training_set,-c(summary_judgment)), mtry = sqrt(29))
+
+levels(test_set$statute) <- levels(training_set$statute)
+levels(test_set$protected_class) <- levels(training_set$protected_class)
+levels(test_set$additional_nos) <- levels(training_set$additional_nos)
+levels(test_set$jury_demand) <- levels(training_set$jury_demand)
+levels(test_set$informa_pauperis) <- levels(training_set$informa_pauperis)
+levels(test_set$class_action) <- levels(training_set$class_action)
+levels(test_set$arbitration_at_filing) <- levels(training_set$arbitration_at_filing)
+levels(test_set$issue_joined) <- levels(training_set$issue_joined)
+levels(test_set$pretrial_conf) <- levels(training_set$pretrial_conf)
+
+preds_sj_test <- predict(rf_train_sj, test_set, type = "prob")
+preds_settled_test <- predict(rf_train_settled, test_set, type = "prob")
+submission_for_testing <- test_dockets %>% select(mudac_id) %>%
+  mutate(SummaryJudgment = preds_sj_test[,2], Settled = preds_settled_test[,2])
+submission_for_testing %>% arrange(desc(mudac_id))
+submission_table<- submission_for_testing %>% gather("outcome", "probability", -mudac_id) %>% arrange(desc(mudac_id)) %>% mutate(id = paste(mudac_id,outcome, sep = "-")) %>% select(id, probability)
+submission_table
+
+write.csv(submission_table,"C:/Users/asus/Dropbox/MUDAC/MUDAC/Predictions/carleton.edu_Team_01.csv", row.names = FALSE)
+```
+
+
+
+
+
+```{r}
+preds_sj_test <- predict(rf_train_sj, test_set, type = "prob")
+submission_for_testing <- test_dockets %>% select(mudac_id) %>%
+  mutate(SummaryJudgment = preds_sj_test[,2], class_sj_val = ifelse(preds_sj_val[,2]>0.5,1,0))
+submission_for_testing_sj
 ```
 
 
