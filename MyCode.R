@@ -265,5 +265,197 @@ ggplot()+geom_bar(stat="identity",data=train10,aes(x=district,y=dif,fill=circuit
 ggplot()+geom_bar(stat="identity",data=train10,aes(x=reorder(district,dif),y=dif,fill=circuit))
 
 
+#Check
+
+length(which(as.character(train$motion_type.tm)==
+               "Motion for Summary Judgment"&as.character(train$outcome)=="Summary Judgment"))
+
+length(intersect(which(as.character(train$motion_type.tm)==
+               "Motion for Summary Judgment"&as.character(train$outcome)=="Summary Judgment"),
+       which(as.character(train$decision)=="Granted")))
+
+
+length(intersect(which(as.character(train$motion_type.tm)==
+                         "Motion for Summary Judgment"&as.character(train$outcome)=="Summary Judgment"),
+                 which(as.character(train$decision)=="Granted in Part")))
+
+
+#Add NA's in decision
+length(which(is.na(train$decision)))
+
+length(intersect(which(as.character(train$motion_type.tm)==
+                         "Motion for Summary Judgment"&as.character(train$outcome)=="Summary Judgment"),
+                 which(is.na(train$decision))))
+
+
+View(train[c("9","10","11"),c("motion_type.tm","outcome","decision")])
+
+  #Note: No use
+
+
+#Motion for summary judgment
+
+
+train$MoSumGet<-0
+train$MoSumGet[which(as.character(train$motion_type.tm)=="Motion for Summary Judgment"&
+                       train$summary_judgment==1)]<-1
+
+ggplot(train[train$MoSumGet==1,],aes(x=district,fill=district))+
+  geom_bar()
+
+
+train11<-train%>%
+  filter(train$MoSumGet==1)%>%
+  group_by(district)%>%
+  summarise(countSM=n())
+
+train12<-train%>%
+  filter(as.character(train$motion_type.tm)=="Motion for Summary Judgment")%>%
+  group_by(district)%>%
+  summarise(countAll=n())
+
+train_mo_sm <-full_join(train11, train12, by = c('district' = 'district'))
+train_mo_sm$circuit<-NULL
+train_mo_sm$circuit[1:9]<-6
+train_mo_sm$circuit[10:16]<-7
+train_mo_sm$circuit[17:26]<-8
+train_mo_sm$circuit<-as.factor(train_mo_sm$circuit)
+train_mo_sm<-train_mo_sm[-27,]
+
+train_mo_sm$ratio<-train_mo_sm$countSM/train_mo_sm$countAll
+
+train_mo_sm%>%
+  group_by(circuit)%>%
+  summarise(mean=mean(ratio),variance=var(ratio),counts=n())
+
+
+ggplot(train_mo_sm,aes(x=circuit,y=ratio,fill=circuit))+
+  geom_bar(stat="summary",fun.y="mean")
+
+ggplot(train_mo_sm,aes(x=district,y=ratio,fill=circuit))+
+  geom_bar(stat = 'identity')
+
+ggplot(train_mo_sm,aes(x=reorder(district,ratio),y=ratio,fill=circuit))+
+  geom_bar(stat = 'identity')
+
+
+df7 <- data.frame(train_mo_sm$district, train_mo_sm$countSM, train_mo_sm$countAll)
+names(df7)<-c("district","SumJudClosed","SumJudclosedMotion")
+df8 <- reshape2::melt(df7, id.vars='district')
+head(df8)
+
+ggplot(df8, aes(x=district, y=value, fill=variable)) +
+  geom_bar(stat='identity', position='dodge')
+
+ggplot(df8, aes(x=reorder(district,value), y=value, fill=variable)) +
+  geom_bar(stat='identity', position='dodge')
+
+
+#Motion to dismiss
+length(which(as.character(train$outcome)=="Dismissed"&
+        as.character(train$motion_type.tm)=="Motion to Dismiss"))
+
+length(which(as.character(train$outcome)!="Dismissed"&
+               as.character(train$motion_type.tm)=="Motion to Dismiss"))
+
+
+train$MoSumDis<-0
+train$MoSumDis[which(as.character(train$motion_type.tm)=="Motion to Dismiss"&
+                       as.character(train$outcome)=="Dismissed")]<-1
+
+ggplot(train[which(train$MoSumDis==1),],aes(x=district,fill=district))+
+  geom_bar()
+
+
+train13<-train%>%
+  filter(train$MoSumDis==1)%>%
+  group_by(district)%>%
+  summarise(countSM=n())
+
+train14<-train%>%
+  filter(as.character(train$motion_type.tm)=="Motion to Dismiss")%>%
+  group_by(district)%>%
+  summarise(countAll=n())
+
+train_mo_sd <-full_join(train13, train14, by = c('district' = 'district'))
+train_mo_sd$circuit<-NULL
+train_mo_sd$circuit[1:9]<-6
+train_mo_sd$circuit[10:16]<-7
+train_mo_sd$circuit[17:26]<-8
+train_mo_sd$circuit<-as.factor(train_mo_sd$circuit)
+train_mo_sd<-train_mo_sd[-27,]
+
+train_mo_sd$ratio<-train_mo_sd$countSM/train_mo_sd$countAll
+
+train_mo_sd%>%
+  group_by(circuit)%>%
+  summarise(mean=mean(ratio),variance=var(ratio),counts=n())
+
+
+ggplot(train_mo_sd,aes(x=circuit,y=ratio,fill=circuit))+
+  geom_bar(stat="summary",fun.y="mean")
+
+ggplot(train_mo_sd,aes(x=district,y=ratio,fill=circuit))+
+  geom_bar(stat = 'identity')
+
+ggplot(train_mo_sd,aes(x=reorder(district,ratio),y=ratio,fill=circuit))+
+  geom_bar(stat = 'identity')
+
+
+df9 <- data.frame(train_mo_sd$district, train_mo_sd$countSM, train_mo_sd$countAll)
+names(df9)<-c("district","SumJudClosed","SumJudclosedMotion")
+df10 <- reshape2::melt(df9, id.vars='district')
+head(df10)
+
+ggplot(df10, aes(x=district, y=value, fill=variable)) +
+  geom_bar(stat='identity', position='dodge')
+
+ggplot(df10, aes(x=reorder(district,value), y=value, fill=variable)) +
+  geom_bar(stat='identity', position='dodge')
+
+
+
+#Favor the plaintiff/defendant 
+
+ggplot(train,aes(x=outcome,fill=motion_type.tm))+
+  geom_bar()+facet_wrap(~motion_type.om)+
+  theme(axis.text.x=element_text(angle=45,hjust=1))
+
+
+ggplot(train,aes(x=outcome,fill=summary_judgment))+
+  geom_bar()+facet_wrap(~motion_type.tm)+
+  theme(axis.text.x=element_text(angle=45,hjust=1))
+
+ggplot(train,aes(x=outcome,fill=filing_party.om))+
+  geom_bar()+facet_wrap(~motion_type.tm)+
+  theme(axis.text.x=element_text(angle=45,hjust=1))
+
+
+ggplot(train[which(train$decision %in% c("Granted","Granted in Part")),],aes(x=outcome,fill=filing_party.om))+
+  geom_bar()+facet_wrap(~motion_type.om)+
+  theme(axis.text.x=element_text(angle=45,hjust=1))
+
+
+ggplot(train[which(train$decision %in% c("Denied","Denied as Moot")),],aes(x=outcome,fill=filing_party.om))+
+  geom_bar()+facet_wrap(~motion_type.om)+
+  theme(axis.text.x=element_text(angle=45,hjust=1))
+
+
+ggplot(train,aes(x=outcome,fill=filing_party.om))+
+  geom_bar()+facet_wrap(~motion_type.om)+
+  theme(axis.text.x=element_text(angle=45,hjust=1))
+
+
+ggplot(train,aes(x=outcome,fill=decision))+
+  geom_bar()+facet_wrap(~motion_type.om)+
+  theme(axis.text.x=element_text(angle=45,hjust=1))
+
+ggplot(train,aes(x=decision,fill=filed_before_joined.tm))+geom_bar()+facet_wrap(~outcome)+
+  theme(axis.text.x=element_text(angle=45,hjust=1))
+
+
+#Naive method for checking the favor
+
+
 
 
