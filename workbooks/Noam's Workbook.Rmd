@@ -5,28 +5,11 @@ date: "March 28, 2020"
 output: html_document
 ---
 ```{r}
-data$favor_om <- mutate(data$favor_om, 
-                     if("OM filing party" =="Plaintiff" && decision == "Granted"|
-                        "OM filing party" =="Defendant" && decision == "Denied"){"Plaintiff"
-                       }else if("OM filing party"=="Defendant" && decision == "Granted"|
-                                "OM filing party"=="Plaintiff" && decision == "Denied"){"Defendant"
-                         }else{NA})
+data_file %>% gather("variable", "output", -c(your_y_variable)) %>%
+  ggplot(aes(x=your_y_variable, y=output)) + geom_point() + 
+  facet_wrap(~variable)
+  stat_smooth(method="glm", method.args=list(family="binomial"), se=FALSE)
 
-data$favor_tm <- mutate(data$favor_tm, 
-                        #In favor of plaintiff
-                        if("TM filing party" =="Plaintiff" && motion_type == "Motion to Dismiss" && 
-                        outcome == "Dismissed"| "TM filing party" =="Plaintiff" && motion_type == "Motion for Summary
-                        Judgment" && outcome == "Summary Judgment" | "TM filing party" =="Defendant" && 
-                        motion_type == "Motion to Dismiss" && outcome != "Dismissed"| "TM filing party" =="Defendant"
-                        && motion_type == "Motion for Summary Judgment" && outcome != "Summary Judgment" ){"Plaintiff"
-                       }
-                       #in favor of Defendant
-                       else if("TM filing party" =="Defendant" && motion_type == "Motion to Dismiss" && 
-                        outcome == "Dismissed"| "TM filing party" =="Defendant" && motion_type == "Motion for Summary
-                        Judgment" && outcome == "Summary Judgment" | "TM filing party" =="Plaintiff" && 
-                        motion_type == "Motion to Dismiss" && outcome != "Dismissed"| "TM filing party" =="Plaintiff"
-                        && motion_type == "Motion for Summary Judgment" && outcome != "Summary Judgment"){"Defendant"
-                         }else{NA})
 ```
 
 
@@ -60,7 +43,7 @@ test_termination_motions<-read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/t
 test_other_motions<-read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/test_other_motions.csv",header=TRUE)
 districts <- read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/districts.csv",header=TRUE)
 district_fips_code <- read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/district_fips_code.csv",header=TRUE)
-demographics_2015 <- read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/us-census-demographic-data/acs2015_census_tract_data.csv", header = TRUE)
+demographics_2015 <- read.csv("C:/Users/asus/Dropbox/MUDAC/MUDAC/raw_data/us-census-demographic-data/acs2015_county_data.csv", header = TRUE)
 ```
 
 #Data manipulation
@@ -71,23 +54,24 @@ train_dockets <- train_dockets %>% mutate(dismissed =ifelse(outcome == "Dismisse
            as.factor(dismissed))
 
 #demographics
-demographics_2015 <- demographics_2015 %>% separate(CensusTract, c("fips_code", "tract"), sep = 5) %>% mutate(fips_code = as.integer(fips_code)) %>% select(-c(tract, State, County))
-train_dockets_for_demog <- select(train_dockets, c(district, outcome, summary_judgment, settled, dismissed))
-colnames(train_dockets_for_demog)[1] <- "district_number"
-district_w_train_dockets <- full_join(train_dockets_for_demog, district_fips_code, by = "district_number")
-district_w_demog <- full_join(district_w_train_dockets, demographics_2015, by = c("fips_code"))
-district_w_demog_2010_pop <- full_join(district_w_demog, districts, by = c("district_number", "state"))
-train_dockets_w_demog <- full_join(district_w_demog_2010_pop, demographics_2015, by = "district_number")
+demographics <- left_join(district_fips_code, demographics_2015, by = c("fips_code" = "CensusId", 
+                                                                        "county" = "County",
+                                                                        "state" = "State")) %>%
+  mutate(county = as.factor(county), state = as.factor(state))
+
+demographics <- left_join(demographics, districts, by = c("district_number", "state"))
 ```
 ##Merging
 ```{r}
-train_other <- full_join(select(train_dockets, c(1,33:36)), train_other_motions, by = "mudac_id")
+train_other <- left_join(select(train_dockets, c(1,33:36)), train_other_motions, by = "mudac_id")
 
-train_termination <- full_join(select(train_dockets, c(1,33:36)), train_termination_motions, by = "mudac_id")
+train_termination <- left_join(select(train_dockets, c(1,33:36)), train_termination_motions, by = "mudac_id")
 
+train_demographics <- left_join(select(train_dockets, c(1,3,33:36)), demographics, by = 
+                                  c("district" = "district_number"))
 
-train_full <- full_join(train_dockets, train_other_motions, by = "mudac_id")
-train_full <- full_join(train_full, train_termination_motions, by = "mudac_id")
+train_full <- left_join(train_dockets, train_other_motions, by = "mudac_id")
+train_full <- left_join(train_full, train_termination_motions, by = "mudac_id")
 colnames(train_full)[37:46] <- c("other_motion_type", "other_filing_party", "other_filed_before_joined",
                                  "other_decision", "other_decided_before_jointed", "other_proceeding_percentile",
                                  "termination_motion_type", "termination_filing_party",
@@ -104,7 +88,7 @@ colnames(train_full)[37:46] <- c("other_motion_type", "other_filing_party", "oth
 #Using LM
 train_summary_judgment_lm <- glm(summary_judgment ~ ., data =train_summary_judgment, family = "binomial")
 train_settled_lm <- glm(settled ~ ., data =train_settled, family = "binomial")
-train_dismissed_lm <- glm(dismissed ~ ., data =train_dismissed, family = "binomial")
+train_dismissed_lm <- glm(dismissed ~ ., data = train_dismissed, family = "binomial")
 
 stargazer(train_summary_judgment_lm, train_settled_lm, train_dismissed_lm, type = "text")
 ```
@@ -113,15 +97,11 @@ stargazer(train_summary_judgment_lm, train_settled_lm, train_dismissed_lm, type 
 
 ##b) [Level: Intermediate] Identify any relevant demographic features of a district/court venue that may influence the outcome of a case
 ```{r}
-train_summary_judgment_demog <- district_w_demog %>% select(-c(outcome, settled, dismissed))
+demographics_summary_judgment_lm <- glm(summary_judgment ~ ., data = select(train_demographics, -c(outcome, settled, dismissed)), family = "binomial")
+demographics_settled_lm <- glm(settled ~ ., data = select(train_demographics, -c(outcome, summary_judgment, dismissed)), family = "binomial")
+demographics_dismissed_lm <- glm(dismissed ~ ., data = select(train_demographics, -c(outcome, settled, summary_judgment)), family = "binomial")
 
-train_settled_demog <- district_w_demog %>% select(-c(outcome, summary_judgment, dismissed))
-
-train_dismissed_demog <- district_w_demog %>% select(-c(outcome, settled, summary_judgment))
-
-demographics_summary_judgment_lm <- glm(summary_judgment ~ ., data = train_summary_judgment_demog, family = "binomial")
-demographics_settled_lm <- glm(settled ~ ., data = train_settled_demog, family = "binomial")
-demographics_dismissed_lm <- glm(dismissed ~ ., data = train_dismissed_demog, family = "binomial")
+stargazer(demographics_summary_judgment_lm, demographics_settled_lm, demographics_dismissed_lm, type = "text")
 ```
 
 
@@ -337,6 +317,8 @@ rf_settled_tree
 
 ###Neural Net
 ```{r}
+apply(data,2,function(x) sum(is.na(x)))
+
 settled_matrix <- model.matrix( 
   ~ as + Pclass + Sex + Age + SibSp + Parch + Fare + Embarked, 
   data = d 
