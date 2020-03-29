@@ -442,8 +442,6 @@ ggplot(train,aes(x=decision,fill=filed_before_joined.tm))+geom_bar()+facet_wrap(
 
 #Naive method for checking the favor
 
-
-
 #trainF<-train[which(as.character(train$filing_party.tm)%in%c("Defendant","Plaintiff")|
                       #as.character(train$filing_party.om)%in%c("Defendant","Plaintiff") ),
               #c("mudac_id","district","filing_party.tm","motion_type.tm","summary_judgment",
