@@ -4,6 +4,32 @@ author: "Noam Benkler"
 date: "March 28, 2020"
 output: html_document
 ---
+```{r}
+data$favor_om <- mutate(data$favor_om, 
+                     if("OM filing party" =="Plaintiff" && decision == "Granted"|
+                        "OM filing party" =="Defendant" && decision == "Denied"){"Plaintiff"
+                       }else if("OM filing party"=="Defendant" && decision == "Granted"|
+                                "OM filing party"=="Plaintiff" && decision == "Denied"){"Defendant"
+                         }else{NA})
+
+data$favor_tm <- mutate(data$favor_tm, 
+                        #In favor of plaintiff
+                        if("TM filing party" =="Plaintiff" && motion_type == "Motion to Dismiss" && 
+                        outcome == "Dismissed"| "TM filing party" =="Plaintiff" && motion_type == "Motion for Summary
+                        Judgment" && outcome == "Summary Judgment" | "TM filing party" =="Defendant" && 
+                        motion_type == "Motion to Dismiss" && outcome != "Dismissed"| "TM filing party" =="Defendant"
+                        && motion_type == "Motion for Summary Judgment" && outcome != "Summary Judgment" ){"Plaintiff"
+                       }
+                       #in favor of Defendant
+                       else if("TM filing party" =="Defendant" && motion_type == "Motion to Dismiss" && 
+                        outcome == "Dismissed"| "TM filing party" =="Defendant" && motion_type == "Motion for Summary
+                        Judgment" && outcome == "Summary Judgment" | "TM filing party" =="Plaintiff" && 
+                        motion_type == "Motion to Dismiss" && outcome != "Dismissed"| "TM filing party" =="Plaintiff"
+                        && motion_type == "Motion for Summary Judgment" && outcome != "Summary Judgment"){"Defendant"
+                         }else{NA})
+```
+
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -137,6 +163,8 @@ lm_dis_train_oth <- glm(dismissed ~ ., select(train_other_decision_twoleveled, c
 
 stargazer(lm_SJ_train_oth, lm_set_train_oth, lm_dis_train_oth, type = "text")
 ```
+
+
 
 
 #Q5) [Level: Advanced] The MUDAC 2020 challenge includes a prediction component. This part of the competition will take place in Kaggle (additional information regarding Kaggle will be provided separately). MUDAC 2020 requires teams to build a predictive model that provides a probability that a case will be closed by a summary judgement and a second predictive model that provides a probability that a case will be closed by a settlement.
