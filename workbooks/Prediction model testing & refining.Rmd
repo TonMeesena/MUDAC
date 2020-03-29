@@ -1,0 +1,26 @@
+---
+title: "Testing Prediction Models"
+author: "Noam Benkler"
+date: "March 28, 2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(psych)
+library(ggplot2)
+library(plyr)
+library(tidyverse)
+library(partykit)
+library(rpart)
+library(caret)
+library(Metrics)
+library(dplyr)
+library(corrplot)
+library(randomForest)
+library(stargazer)
+library(readr)
+library(Hmisc)
+library(neuralnet)
+```
+
