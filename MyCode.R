@@ -522,8 +522,17 @@ ggplot(df10, aes(x=reorder(district,value), y=value, fill=variable)) +
        fill="Granted/Total")
 
 
+length(which(as.character(train$decision)=="Granted"&as.character(train$outcome)=="Dismissed"))
+
 
 #Favor the plaintiff/defendant 
+
+
+train%>%
+  ggplot(aes(outcome))+
+  geom_bar(fill="blue")+
+  facet_wrap(~motion_type.tm)
+
 
 ggplot(train,aes(x=outcome,fill=motion_type.tm))+
   geom_bar()+facet_wrap(~motion_type.om)+
@@ -579,7 +588,7 @@ ggplot(train,aes(x=decision))+geom_bar(fill="chocolate2")+facet_wrap(~outcome)+
 
 
 
-ggplot(train,aes(outcome,fill=summary_judgment))+geom_bar()+facet_wrap(~motion_type.tm)+
+ggplot(train,aes(outcome,fill=as.factor(summary_judgment)))+geom_bar()+facet_wrap(~motion_type.tm)+
   theme(axis.text.x=element_text(angle=45,hjust=1))
 
 FscoreDT1<-train%>%
@@ -744,7 +753,7 @@ ggplot(dq2, aes(x=district, y=value, fill=variable)) +
 
 
 
-22ggplot(dq2, aes(x=reorder(district,value), y=value, fill=variable)) +
+ggplot(dq2, aes(x=reorder(district,value), y=value, fill=variable)) +
   geom_bar(stat='identity', position='dodge')
 
 colnames(train_def_plain)[11:12] <- c("Defendant", "Plaintiff")
